@@ -1,0 +1,9 @@
+name: h2az-joint-states
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - samtools
+  - bedtools
+  - macs3

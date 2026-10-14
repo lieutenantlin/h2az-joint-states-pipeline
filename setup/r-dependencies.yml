@@ -1,0 +1,12 @@
+name: h2az-joint-states-r
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconductor-diffbind
+  - bioconductor-deseq2
+  - bioconductor-genomicranges
+  - bioconductor-rsamtools
+  - bioconductor-csaw
+  - r-ggplot2

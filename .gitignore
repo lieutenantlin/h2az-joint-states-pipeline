@@ -1,0 +1,36 @@
+# Generated pipeline outputs
+/results/
+
+# Sequencing inputs and indexes (keep the bundled reference BED)
+*.bam
+*.bam.bai
+*.bai
+*.sam
+*.cram
+*.cram.crai
+*.crai
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.bigWig
+*.bigwig
+*.bw
+
+# Local R sessions and IDE state
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system artifacts
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
