@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 source("R/pipeline_functions.R")
 source("config/settings.R")
+# Step 06: render joint-state summaries and export eligible state-specific BEDs for review.
 if (!requireNamespace("ggplot2", quietly = TRUE)) stop("ggplot2 is required for Step 06", call. = FALSE)
 read_tsv <- function(path) {
   if (!file.exists(path)) stop(sprintf("Missing Step 05 output: %s", path), call. = FALSE)
@@ -15,6 +16,7 @@ for (x in list(primary, interaction)) {
 }
 primary$n <- as.numeric(primary$n); primary$eligible <- as.numeric(primary$eligible)
 interaction$n <- as.numeric(interaction$n); interaction$eligible <- as.numeric(interaction$eligible)
+# Guard against figures whose state bars disagree with their reported eligibility denominators.
 if (!all(vapply(PRIMARY_CONTRASTS, function(ct) sum(primary$n[primary$contrast == ct]) == unique(primary$eligible[primary$contrast == ct]), logical(1)))) {
   stop("Primary state bars do not sum to their eligible denominators", call. = FALSE)
 }
@@ -24,6 +26,7 @@ if (sum(interaction$n[interaction$contrast == "stage_genotype_interaction"]) !=
 }
 out <- "results/06_figures"
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
+# Carry the selected normalization's interpretive limitation into each figure caption.
 normalization_caption <- if (identical(NORMALIZATION, "background")) {
   "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark). Background normalization: relative enrichment; no genome-wide gain/loss claim."
 } else {
@@ -45,9 +48,10 @@ grDevices::png(file.path(out, "joint_states_interaction.png"), width = 1950, hei
 print(interaction_plot)
 grDevices::dev.off()
 primary_loci <- eligible_loci(wide, PRIMARY_CONTRASTS)
-# Derive panel members directly from the shared denominator stated in the exported summary.
+# Check the recomputed primary BED membership count against the exported denominator.
 primary_eligible <- as.integer(summary$eligible[summary$contrast == PRIMARY_CONTRASTS[[1L]]])
 if (length(primary_loci) != primary_eligible) stop("Primary BED denominator does not match eligibility summary", call. = FALSE)
+# The interaction uses its own eligibility denominator, unlike the shared primary panels.
 interaction_loci <- eligible_loci(wide, "stage_genotype_interaction")
 state_rows <- rbind(
   wide[wide$contrast %in% PRIMARY_CONTRASTS & wide$locus_id %in% unique(primary_loci), c("locus_id", "contrast", "joint"), drop = FALSE],

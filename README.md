@@ -52,7 +52,25 @@ Fill the sample sheet and run from this directory:
 bash run_pipeline.sh
 ```
 
-The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R` first, validates the inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–8 in order and stops on the first failure. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R` first, validates the inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–7 in order and stops on the first failure. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+
+## Pipeline script guide
+
+| Order | Path | Role |
+|---|---|---|
+| Setup | `setup_r_dependencies.sh` | Provisions the isolated R and Bioconductor environment. |
+| Setup | `setup_peak_tools.sh` | Provisions samtools, bedtools, MACS3, and external SEACR 1.3 files. |
+| Support | `config/tools.sh` | Resolves tool paths, threads, and optional Conda R. |
+| Support | `config/settings.R` | Defines normalization, threads, and the mm10 blacklist. |
+| Check | `tests/selftest.R` | Checks shared helper invariants before processing samples; it does not validate biological conclusions. |
+| 01 | `scripts/01_validate_inventory.R` | Validates the sample sheet and writes the included, ordered inventory and any missing-peak jobs. |
+| 02 | `scripts/02_call_peaks.sh` | Calls missing PE peaks with SEACR or missing SE peaks with MACS3. |
+| 03 | `scripts/03_build_master_regions.R` | Builds the fixed blacklist-filtered master regions from replicate-supported peaks. |
+| 04 | `scripts/04_diffbind_per_mark.R` | Counts and tests each mark against the master regions for all planned contrasts. |
+| 05 | `scripts/05_joint_states.R` | Joins mark-level calls into joint states and computes primary/interaction eligibility. |
+| 06 | `scripts/06_plot_and_export.R` | Produces figures and state-specific BED files for eligible loci. |
+| 07 | `scripts/07_review_loci.R` | Ranks representative loci for manual IGV review. |
+| Support | `R/pipeline_functions.R` | Supplies shared region, contrast, state, plotting, and BED-export helpers. |
 
 ## Output manifest
 

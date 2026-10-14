@@ -1,4 +1,4 @@
-# Project-wide settings. The runner changes to the project root before sourcing this file.
+# Runtime analysis settings: normalization, worker count, and the required mm10 blacklist.
 PROJECT_ROOT <- normalizePath(getwd(), mustWork = TRUE)
 NORMALIZATION <- "background" # Change to "spikein" only with validated calibration BAMs in every row.
 THREADS <- suppressWarnings(as.integer(Sys.getenv("THREADS", "")))

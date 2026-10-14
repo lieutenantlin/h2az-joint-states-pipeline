@@ -1,3 +1,4 @@
+# Shared constants and helpers for the ordered H2A.Z joint-state pipeline.
 MARKS <- c("H2AZ", "H2AZac", "H2AZub")
 GROUPS <- c("EC", "EK", "LC", "LK")
 KEEP_CHR <- paste0("chr", c(1:19, "X"))
@@ -16,6 +17,8 @@ STATE_LEVELS <- with(
               H2AZ = .state_symbols, stringsAsFactors = FALSE),
   paste0(H2AZ, H2AZac, H2AZub)
 )
+
+# BED/GRanges and fixed-master-region integrity helpers.
 
 stopf <- function(...) stop(sprintf(...), call. = FALSE)
 
@@ -36,6 +39,7 @@ read_bed_gr <- function(path) {
       any(ends <= starts)) {
     stopf("BED coordinates are invalid: %s", path)
   }
+  # BED starts are zero-based; GRanges starts are one-based.
   GenomicRanges::GRanges(seqnames = x[[1L]], ranges = IRanges::IRanges(starts + 1L, ends))
 }
 
@@ -47,6 +51,7 @@ replicate_supported <- function(list_of_replicate_GRanges, min_reps = 2L) {
   }
   nonempty <- Filter(length, list_of_replicate_GRanges)
   if (!length(nonempty)) return(GenomicRanges::GRanges())
+  # Count each candidate at most once per replicate, so duplicate peaks cannot inflate support.
   candidates <- GenomicRanges::reduce(Reduce(function(left, right) c(left, right), nonempty), min.gapwidth = 0L)
   supported <- integer(length(candidates))
   for (replicate in nonempty) {
@@ -61,6 +66,7 @@ build_master <- function(list_of_supported, blacklist) {
   if (!length(list_of_supported)) stopf("No supported regions were supplied")
   nonempty <- Filter(length, list_of_supported)
   if (!length(nonempty)) stopf("No supported regions were supplied")
+  # Keep directly adjacent regions distinct while merging true overlaps.
   master <- GenomicRanges::reduce(Reduce(function(left, right) c(left, right), nonempty), min.gapwidth = 0L)
   master <- master[as.character(GenomicRanges::seqnames(master)) %in% KEEP_CHR]
   if (length(blacklist) && length(master)) {
@@ -93,6 +99,7 @@ map_to_master <- function(counted, master) {
   if (length(counted) != length(master)) {
     stopf("Counted intervals (%d) do not match master intervals (%d)", length(counted), length(master))
   }
+  # Permit only a one-base coordinate shift while requiring a unique bidirectional mapping.
   hits <- GenomicRanges::findOverlaps(counted, master, type = "equal", maxgap = 1L)
   qn <- tabulate(S4Vectors::queryHits(hits), nbins = length(counted))
   sn <- tabulate(S4Vectors::subjectHits(hits), nbins = length(master))
@@ -103,6 +110,8 @@ map_to_master <- function(counted, master) {
   master_index[S4Vectors::queryHits(hits)] <- S4Vectors::subjectHits(hits)
   master_index
 }
+
+# DESeq2 contrast and per-mark state helpers.
 
 contrast_vector <- function(results_names, group_col, ref, weights) {
   if (is.null(names(weights)) || !setequal(names(weights), GROUPS)) {
@@ -133,6 +142,7 @@ zero_in_groups <- function(counts, sample_groups, weights) {
   rowSums(counts[, sample_groups %in% groups, drop = FALSE] != 0L) == 0L
 }
 
+# 0 means no detected change; N means the locus is untestable for this contrast.
 classify_state <- function(lfc, pvalue, padj, zero_counts = FALSE) {
   missing <- is.na(lfc) | is.na(pvalue) | is.na(padj) | zero_counts
   out <- rep("0", length(lfc))
@@ -155,6 +165,8 @@ state_reason <- function(lfc, pvalue, padj, zero_counts = FALSE, counted = TRUE)
   out[counted & !zero_counts & !is.na(pvalue) & !is.na(padj) & is.na(lfc)] <- "lfc_NA"
   out
 }
+
+# Joint-state construction and eligibility/counting helpers.
 
 joint_states <- function(calls) {
   needed <- c("locus_id", "contrast", "mark", "state")
@@ -198,6 +210,8 @@ eligible_loci <- function(wide, contrasts) {
   }, logical(1))
   as.character(names(complete_by_locus)[complete_by_locus])
 }
+
+# Joint-state counting, plotting, and IGV-oriented BED export helpers.
 
 count_states <- function(wide, loci, contrasts) {
   if (!all(c("locus_id", "contrast", "joint") %in% names(wide))) {
@@ -251,6 +265,7 @@ write_state_beds <- function(states, master, output_dir) {
       if (!nrow(y)) next
       dir <- file.path(output_dir, contrast)
       dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+      # Use filesystem-safe P/Z/M codes for +, 0, and - joint-state symbols.
       code <- chartr("+0-", "PZM", state)
       ranges <- master[match(y$locus_id, ids)]
       bed <- data.frame(as.character(GenomicRanges::seqnames(ranges)),

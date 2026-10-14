@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+# Focused executable checks for shared helper invariants; this is not biological validation.
 source("R/pipeline_functions.R")
 expect_equal <- function(actual, expected, message = "values differ") if (!identical(actual, expected)) stop(message, call. = FALSE)
 expect_error <- function(expr, pattern) {

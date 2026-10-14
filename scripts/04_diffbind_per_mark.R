@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 
+# Step 04: count one mark on the fixed master loci and test all planned four-group contrasts.
 main <- function(mark) {
   source("R/pipeline_functions.R")
   source("config/settings.R")
@@ -14,6 +15,7 @@ main <- function(mark) {
   samples <- samples[samples$mark == mark, , drop = FALSE]
   if (!nrow(samples)) stop(sprintf("No validated samples for %s", mark), call. = FALSE)
   if (!identical(sort(unique(samples$group)), sort(GROUPS))) stop("All four required groups are required; reduced-comparison designs are not selected automatically", call. = FALSE)
+  # The planned contrast set needs every EC/EK/LC/LK group; no reduced design is inferred.
   master <- readRDS(master_path)
   master_ids <- master_locus_ids(master)
   if (!length(master)) stop("master_regions.rds is empty", call. = FALSE)
@@ -48,6 +50,7 @@ main <- function(mark) {
   # explicit FALSE in the DBA object; pv.normalize otherwise defaults a missing field to TRUE.
   # Persist the documented requested setting so normalization cannot silently choose subtraction.
   dbo$bSubControl <- FALSE
+  # Record and verify the native DiffBind row order before relabeling rows with master IDs.
   raw_binding <- DiffBind::dba.peakset(dbo, bRetrieve = TRUE, DataType = DiffBind::DBA_DATA_GRANGES)
   if (!inherits(raw_binding, "GRanges")) stop("DiffBind did not return a GRanges raw binding matrix", call. = FALSE)
   raw_index_native <- map_to_master(raw_binding, master)
@@ -65,6 +68,7 @@ main <- function(mark) {
   row_mapping <- data.frame(dba_row_index = seq_along(master),
                             locus_id = master_ids[raw_index_native], stringsAsFactors = FALSE)
 
+  # Use the configured normalization mode and save the returned factors for interpretation.
   normalization <- if (identical(NORMALIZATION, "spikein")) {
     DiffBind::dba.normalize(dbo, method = DiffBind::DBA_DESEQ2, normalize = DiffBind::DBA_NORM_NATIVE, spikein = TRUE)
   } else {
@@ -86,6 +90,7 @@ main <- function(mark) {
   utils::write.table(norm_table, file.path(out, "normalization.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
   utils::write.table(row_mapping, file.path(out, "dba_row_to_locus_id.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
 
+  # Include batch only when validation established a multi-batch, estimable design.
   design <- if (length(unique(samples$batch)) > 1L) "~ Tissue + Condition" else "~ Condition"
   dbo <- DiffBind::dba.contrast(normalization, design = design, contrast = c("Condition", "EK", "EC"),
                                 reorderMeta = list(Condition = GROUPS))
@@ -120,6 +125,7 @@ main <- function(mark) {
     if (length(candidate) != 1L) stop("Cannot determine the DESeq2 reference group", call. = FALSE)
     candidate
   }
+  # A state of 0 is no detected change; N records an untestable locus/contrast.
   all_results <- lapply(names(CONTRASTS), function(contrast_name) {
     weights <- CONTRASTS[[contrast_name]]
     res <- DESeq2::results(dds, contrast = contrast_vector(DESeq2::resultsNames(dds), group_col, ref, weights), alpha = ALPHA)

@@ -1,11 +1,13 @@
 #!/usr/bin/env Rscript
 source("R/pipeline_functions.R")
+# Step 05: combine complete per-mark contrast calls into joint states and shared denominators.
 
 master_path <- "results/03_master/master_regions.rds"
 if (!file.exists(master_path)) stop("Run Step 03 before Step 05", call. = FALSE)
 master <- readRDS(master_path)
 expected_loci <- master_locus_ids(master)
 required <- c("locus_id", "contrast", "mark", "baseMean", "padj", "state", "reason")
+# Reject incomplete mark tables so missing calls cannot be interpreted as no detected change.
 tables <- lapply(MARKS, function(mark) {
   path <- file.path("results/04_diffbind", mark, paste0(mark, "_all_loci_results.tsv"))
   if (!file.exists(path)) stop(sprintf("Missing differential-results table: %s", path), call. = FALSE)
@@ -28,11 +30,13 @@ primary_loci <- eligible_loci(wide, PRIMARY_CONTRASTS)
 interaction_loci <- eligible_loci(wide, "stage_genotype_interaction")
 if (!length(primary_loci)) stop("No loci are jointly eligible across all four primary contrasts", call. = FALSE)
 if (!length(interaction_loci)) stop("No loci are jointly eligible for the interaction contrast", call. = FALSE)
+# Primary panels share loci testable across all four primary contrasts; interaction is separate.
 primary_counts <- count_states(wide, primary_loci, PRIMARY_CONTRASTS)
 interaction_counts <- count_states(wide, interaction_loci, "stage_genotype_interaction")
 reason_table <- as.data.frame(with(calls, table(mark, contrast, reason, useNA = "ifany")), stringsAsFactors = FALSE)
 names(reason_table) <- c("mark", "contrast", "reason", "n")
 reason_table <- reason_table[reason_table$n > 0L, , drop = FALSE]
+# Preserve per-mark testability reasons alongside the state-count summaries.
 eligibility <- data.frame(contrast = c(PRIMARY_CONTRASTS, "stage_genotype_interaction"),
                           eligible = c(rep.int(length(primary_loci), length(PRIMARY_CONTRASTS)), length(interaction_loci)),
                           eligible_primary = length(primary_loci),

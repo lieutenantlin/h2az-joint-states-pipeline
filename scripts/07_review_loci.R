@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 source("R/pipeline_functions.R")
+# Step 07: select a small, ranked set of loci for manual IGV review.
 wide_path <- "results/05_joint/joint_locus_states.tsv"
 if (!file.exists(wide_path)) stop("Run Step 05 before Step 07", call. = FALSE)
 wide <- utils::read.delim(wide_path, stringsAsFactors = FALSE, check.names = FALSE, colClasses = "character", na.strings = "NA")
@@ -11,6 +12,7 @@ result_tables <- lapply(MARKS, function(mark) {
   x
 })
 calls <- do.call(rbind, result_tables)
+# Review representative concordant, discordant, and no-detected-change joint-state patterns.
 review_states <- c("+++", "---", "+0-", "000")
 selected <- list()
 for (contrast in names(CONTRASTS)) for (state in review_states) {
@@ -20,6 +22,7 @@ for (contrast in names(CONTRASTS)) for (state in review_states) {
     x <- calls[calls$locus_id == locus & calls$contrast == contrast, , drop = FALSE]
     if (nrow(x) != length(MARKS) || !setequal(x$mark, MARKS)) stop("Review input is incomplete", call. = FALSE)
     x <- x[match(MARKS, x$mark), , drop = FALSE]
+    # Changed states rank by their weakest changed-mark FDR; 000 ranks by signal strength.
     if (identical(state, "000")) return(min(as.numeric(x$baseMean), na.rm = TRUE))
     changed <- strsplit(state, "", fixed = TRUE)[[1L]] != "0"
     max(as.numeric(x$padj)[changed], na.rm = TRUE)

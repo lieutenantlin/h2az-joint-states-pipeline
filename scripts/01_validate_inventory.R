@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 source("R/pipeline_functions.R")
 source("config/settings.R")
+# Step 01: validate analysis inputs and write a deterministic inventory for downstream stages.
 
 required_columns <- c("sample_id", "include", "mark", "stage", "genotype", "animal_id", "batch",
                       "sex", "layout", "bam", "peaks", "igg_bam", "spikein_bam", "bigwig")
@@ -22,6 +23,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
   if (any(!grepl("^[A-Za-z][A-Za-z0-9_]*$", samples$sample_id))) {
     errors <- c(errors, "sample_id must match ^[A-Za-z][A-Za-z0-9_]*$")
   }
+  # Excluded rows remain in the source sheet but do not enter analysis or peak calling.
   included <- samples[samples$include == "TRUE", , drop = FALSE]
   if (!nrow(included)) errors <- c(errors, "No included samples")
   if (nrow(included)) {
@@ -40,6 +42,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
       layouts <- unique(included$layout[included$mark == mark])
       if (length(layouts) > 1L) errors <- c(errors, sprintf("layout must be identical within mark %s", mark))
     }
+    # Encode the planned stage x genotype groups used by every later contrast.
     included$group <- NA_character_
     valid_group <- valid_stage & valid_genotype
     included$group[valid_group] <- ifelse(included$stage[valid_group] == "early" & included$genotype[valid_group] == "control", "EC",
@@ -70,6 +73,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
       print(replication)
       short <- which(replication < 2L, arr.ind = TRUE)
       if (nrow(short)) errors <- c(errors, apply(short, 1L, function(z) sprintf("Need >=2 biological replicates for %s x %s", rownames(replication)[z[[1L]]], colnames(replication)[z[[2L]]])))
+      # A batch term is used later only when it is estimable with the four groups.
       for (mark in MARKS) {
         x <- included[included$mark == mark, , drop = FALSE]
         if (length(unique(x$batch)) > 1L) {
@@ -86,6 +90,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
         }
       }
     }
+    # Stable order and within-group indices make the downstream sample sheet reproducible.
     included <- included[order(match(included$mark, MARKS), match(included$group, GROUPS), included$sample_id), , drop = FALSE]
     included$rep_index <- ave(included$sample_id, interaction(included$mark, included$group, drop = TRUE), FUN = seq_along)
   }
@@ -93,6 +98,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
 if (length(errors)) stop(paste(c("Sample inventory validation failed:", paste0("- ", unique(errors))), collapse = "\n"), call. = FALSE)
 dir.create("results/01_inventory", recursive = TRUE, showWarnings = FALSE)
 utils::write.csv(included, "results/01_inventory/samples_validated.csv", row.names = FALSE, quote = TRUE)
+# Only included samples without supplied peaks become Step 02 jobs.
 jobs <- included[!nzchar(included$peaks), c("sample_id", "layout", "bam", "igg_bam"), drop = FALSE]
 job_path <- "results/01_inventory/peak_jobs.tsv"
 if (nrow(jobs)) {

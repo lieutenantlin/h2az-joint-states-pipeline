@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Provision or update the isolated R environment used by the analysis pipeline.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ENV_PREFIX=${H2AZ_R_ENV:-"${HOME}/.local/share/conda/envs/h2az-joint-states-r"}

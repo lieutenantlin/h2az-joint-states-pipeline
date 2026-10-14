@@ -1,4 +1,4 @@
-# Peak-calling tools. Source from the project root (or after computing PROJECT_ROOT).
+# Runtime tool and optional Conda-R selection for the pipeline entry points.
 THREADS=${THREADS:-4}
 H2AZ_TOOLS_ENV=${H2AZ_TOOLS_ENV:-"${HOME}/.local/share/conda/envs/h2az-joint-states"}
 H2AZ_R_ENV=${H2AZ_R_ENV:-"${HOME}/.local/share/conda/envs/h2az-joint-states-r"}

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Provision or update peak-calling tools and the external SEACR 1.3 scripts.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ENV_PREFIX=${H2AZ_TOOLS_ENV:-"${HOME}/.local/share/conda/envs/h2az-joint-states"}

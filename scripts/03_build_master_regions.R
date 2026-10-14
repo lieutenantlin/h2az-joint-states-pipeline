@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 source("R/pipeline_functions.R")
 source("config/settings.R")
+# Step 03: construct a fixed, blacklist-filtered locus set for all mark-level counting.
 
 inventory <- "results/01_inventory/samples_validated.csv"
 if (!file.exists(inventory)) stop("Run scripts/01_validate_inventory.R first", call. = FALSE)
@@ -8,6 +9,7 @@ samples <- utils::read.csv(inventory, stringsAsFactors = FALSE, check.names = FA
 if (!nrow(samples)) stop("Validated inventory is empty", call. = FALSE)
 if (!file.exists(BLACKLIST)) stop(sprintf("Blacklist is missing: %s", BLACKLIST), call. = FALSE)
 blacklist <- read_bed_gr(BLACKLIST)
+# Prefer a supplied peak path; otherwise resolve the layout-specific Step 02 output.
 peak_path <- function(row) {
   if (nzchar(row[["peaks"]])) return(row[["peaks"]])
   if (identical(row[["layout"]], "PE")) return(file.path("results/02_peaks", paste0(row[["sample_id"]], ".stringent.bed")))
@@ -15,6 +17,7 @@ peak_path <- function(row) {
 }
 strata <- list()
 support <- data.frame(mark = character(), group = character(), replicate_peaks = integer(), supported_regions = integer(), stringsAsFactors = FALSE)
+# Require support from at least two biological replicates within each mark x group stratum.
 for (mark in MARKS) for (group in GROUPS) {
   x <- samples[samples$mark == mark & samples$group == group, , drop = FALSE]
   peaks <- lapply(seq_len(nrow(x)), function(i) {
@@ -27,11 +30,13 @@ for (mark in MARKS) for (group in GROUPS) {
   support <- rbind(support, data.frame(mark = mark, group = group, replicate_peaks = sum(vapply(peaks, length, integer(1))), supported_regions = length(regions), stringsAsFactors = FALSE))
   if (!length(regions)) warning(sprintf("No supported regions for %s x %s", mark, group), call. = FALSE)
 }
+# Combine supported strata only after within-stratum replicate support has been established.
 master <- build_master(strata, blacklist)
 if (!length(master)) stop("Master region set is empty after chromosome and blacklist filtering", call. = FALSE)
 out <- "results/03_master"
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 saveRDS(master, file.path(out, "master_regions.rds"))
+# Persist stable locus IDs in the RDS and BED4; also write a coordinate-only BED3 counting artifact.
 master_ids <- master_locus_ids(master)
 master_bed <- data.frame(as.character(GenomicRanges::seqnames(master)), GenomicRanges::start(master) - 1L,
                          GenomicRanges::end(master), master_ids, stringsAsFactors = FALSE)
