@@ -30,11 +30,21 @@ Check `config/settings.R`: `NORMALIZATION` defaults to `"background"` (relative 
 
 ## Input files and sample sheet
 
-The CSV header is fixed and exact:
+The default CSV omits the independently optional `animal_id` and `batch` columns:
+
+```text
+sample_id,include,mark,stage,genotype,sex,layout,bam,peaks,igg_bam,spikein_bam,bigwig
+```
+
+Only `animal_id` and `batch` may be omitted; all remaining columns must appear in the order above. Either optional column may be supplied independently in its original position, after `genotype` and before `sex` (`animal_id` before `batch` when both are present). The complete supported header is:
 
 ```text
 sample_id,include,mark,stage,genotype,animal_id,batch,sex,layout,bam,peaks,igg_bam,spikein_bam,bigwig
 ```
+
+Omission means removing the column, not leaving its cells empty. Every included row must have a nonempty value in each supplied optional column; all-empty and partially empty columns are errors. Excluded rows do not participate in these metadata checks. Supplied animal IDs must be unique within each mark; the same animal may appear across different marks. Omitted columns stay absent in the validated inventory: no animal IDs or batch labels are invented.
+
+Independent biological replicates are still required when `animal_id` is omitted; the user is responsible for their independence. Technical replicates are not biological replicates. Supply `batch` when batch adjustment is needed: multiple batch levels select `~ Tissue + Condition`, while an omitted or single-level batch selects `~ Condition`. Removing batch metadata does not correct confounding.
 
 Use `TRUE`/`FALSE` in `include`; only included rows enter the analysis. Values are `mark` = `H2AZ`, `H2AZac` or `H2AZub`; `stage` = `early` or `late`; `genotype` = `control` or `cKO`; `layout` = `PE` or `SE`. Use one row per animal per mark: merge technical runs first. Use valid DiffBind-safe IDs matching `[A-Za-z][A-Za-z0-9_]*`. The BAM must be indexed, mm10-aligned, use `chr` chromosome names, and have consistent alignment/MAPQ/duplicate filtering across samples. Fill `peaks` with a precomputed peak file path to reuse it; otherwise Step 2 calls peaks. `igg_bam` and `spikein_bam` are optional only under the plan's conditions; `bigwig` is for visualization, not statistical inference. Supply file paths readable from the project root; paths with commas cannot be represented safely in this CSV format.
 

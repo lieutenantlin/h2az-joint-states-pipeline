@@ -3,18 +3,20 @@ source("R/pipeline_functions.R")
 source("config/settings.R")
 # Step 01: validate analysis inputs and write a deterministic inventory for downstream stages.
 
-required_columns <- c("sample_id", "include", "mark", "stage", "genotype", "animal_id", "batch",
-                      "sex", "layout", "bam", "peaks", "igg_bam", "spikein_bam", "bigwig")
+canonical_columns <- c("sample_id", "include", "mark", "stage", "genotype", "animal_id", "batch",
+                       "sex", "layout", "bam", "peaks", "igg_bam", "spikein_bam", "bigwig")
+optional_columns <- c("animal_id", "batch")
 path <- "config/samples.csv"
 if (!file.exists(path)) stop("Missing config/samples.csv", call. = FALSE)
 samples <- utils::read.csv(path, colClasses = "character", na.strings = character(), check.names = FALSE,
                            stringsAsFactors = FALSE)
+expected_columns <- canonical_columns[!canonical_columns %in% setdiff(optional_columns, names(samples))]
 errors <- character()
-if (!identical(names(samples), required_columns)) {
-  errors <- c(errors, sprintf("samples.csv columns must be exactly: %s", paste(required_columns, collapse = ", ")))
+if (!identical(names(samples), expected_columns)) {
+  errors <- c(errors, sprintf("samples.csv columns must follow this canonical order (only animal_id and batch may be omitted): %s", paste(canonical_columns, collapse = ", ")))
 }
 if (!nrow(samples)) errors <- c(errors, "samples.csv has no data rows")
-if (nrow(samples) && identical(names(samples), required_columns)) {
+if (nrow(samples) && identical(names(samples), expected_columns)) {
   samples[is.na(samples)] <- ""
   if (any(!samples$include %in% c("TRUE", "FALSE"))) {
     errors <- c(errors, "include must be TRUE or FALSE")
@@ -35,9 +37,13 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
     if (any(!valid_stage)) errors <- c(errors, "stage must be early or late")
     if (any(!valid_genotype)) errors <- c(errors, "genotype must be control or cKO")
     if (any(!valid_layout)) errors <- c(errors, "layout must be PE or SE")
-    if (any(!nzchar(included$animal_id))) errors <- c(errors, "animal_id is required for every included row")
-    if (any(!nzchar(included$batch))) errors <- c(errors, "batch is required for every included row")
-    if (anyDuplicated(included[c("mark", "animal_id")])) errors <- c(errors, "Only one included row per animal_id per mark is allowed")
+    if ("animal_id" %in% names(included)) {
+      if (any(!nzchar(included$animal_id))) errors <- c(errors, "animal_id is required for every included row")
+      if (anyDuplicated(included[c("mark", "animal_id")])) errors <- c(errors, "Only one included row per animal_id per mark is allowed")
+    }
+    if ("batch" %in% names(included) && any(!nzchar(included$batch))) {
+      errors <- c(errors, "batch is required for every included row")
+    }
     for (mark in intersect(MARKS, unique(included$mark))) {
       layouts <- unique(included$layout[included$mark == mark])
       if (length(layouts) > 1L) errors <- c(errors, sprintf("layout must be identical within mark %s", mark))
@@ -76,7 +82,7 @@ if (nrow(samples) && identical(names(samples), required_columns)) {
       # A batch term is used later only when it is estimable with the four groups.
       for (mark in MARKS) {
         x <- included[included$mark == mark, , drop = FALSE]
-        if (length(unique(x$batch)) > 1L) {
+        if ("batch" %in% names(x) && all(nzchar(x$batch)) && length(unique(x$batch)) > 1L) {
           group <- factor(x$group, levels = GROUPS)
           batch <- factor(x$batch)
           model <- stats::model.matrix(~ batch + group)
