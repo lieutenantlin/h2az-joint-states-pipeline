@@ -1,1 +1,1 @@
-sample_id,include,mark,stage,genotype,animal_id,batch,sex,layout,bam,peaks,igg_bam,spikein_bam,bigwig
+sample_id,include,mark,stage,genotype,sex,layout,bam,peaks,igg_bam,spikein_bam,bigwig

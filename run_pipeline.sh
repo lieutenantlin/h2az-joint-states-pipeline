@@ -8,6 +8,7 @@ export THREADS
 
 # Verify shared helper invariants before accepting the sample inventory.
 "$H2AZ_RSCRIPT" tests/selftest.R
+"$H2AZ_RSCRIPT" tests/inventory_selftest.R
 "$H2AZ_RSCRIPT" scripts/01_validate_inventory.R
 # Call peaks only for included samples that lack a supplied peak path.
 JOBS=results/01_inventory/peak_jobs.tsv

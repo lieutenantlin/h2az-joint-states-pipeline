@@ -30,10 +30,11 @@ main <- function(mark) {
   utils::write.table(data.frame(as.character(GenomicRanges::seqnames(master)), GenomicRanges::start(master) - 1L,
                                 GenomicRanges::end(master), rep.int(1, length(master))),
                      tmp_peaks, sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
-  ss <- data.frame(SampleID = samples$sample_id, Tissue = samples$batch, Factor = samples$mark,
+  ss <- data.frame(SampleID = samples$sample_id, Factor = samples$mark,
                    Condition = samples$group, Replicate = samples$rep_index, bamReads = samples$bam,
                    Peaks = rep.int(tmp_peaks, nrow(samples)), PeakCaller = rep.int("raw", nrow(samples)),
                    ScoreCol = rep.int(4L, nrow(samples)), stringsAsFactors = FALSE, check.names = FALSE)
+  if ("batch" %in% names(samples)) ss$Tissue <- samples$batch
   if (identical(NORMALIZATION, "spikein")) ss$Spikein <- samples$spikein_bam
 
   dbo <- DiffBind::dba(sampleSheet = ss)
@@ -91,7 +92,7 @@ main <- function(mark) {
   utils::write.table(row_mapping, file.path(out, "dba_row_to_locus_id.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
 
   # Include batch only when validation established a multi-batch, estimable design.
-  design <- if (length(unique(samples$batch)) > 1L) "~ Tissue + Condition" else "~ Condition"
+  design <- if ("batch" %in% names(samples) && length(unique(samples$batch)) > 1L) "~ Tissue + Condition" else "~ Condition"
   dbo <- DiffBind::dba.contrast(normalization, design = design, contrast = c("Condition", "EK", "EC"),
                                 reorderMeta = list(Condition = GROUPS))
   dbo <- DiffBind::dba.analyze(dbo, method = DiffBind::DBA_DESEQ2, bBlacklist = FALSE, bGreylist = FALSE)

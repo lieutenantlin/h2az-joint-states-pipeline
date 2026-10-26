@@ -62,7 +62,7 @@ Fill the sample sheet and run from this directory:
 bash run_pipeline.sh
 ```
 
-The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R` first, validates the inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–7 in order and stops on the first failure. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R` and `tests/inventory_selftest.R` before validating the user inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–7 in order and stops on the first failure. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
 
 ## Pipeline script guide
 
@@ -73,6 +73,7 @@ The runner resolves its own project directory, sources the settings for tools, r
 | Support | `config/tools.sh` | Resolves tool paths, threads, and optional Conda R. |
 | Support | `config/settings.R` | Defines normalization, threads, and the mm10 blacklist. |
 | Check | `tests/selftest.R` | Checks shared helper invariants before processing samples; it does not validate biological conclusions. |
+| Check | `tests/inventory_selftest.R` | Runs Step 01 in disposable projects to check all four supported headers and invalid metadata/header cases; placeholder files prove validation only, not alignment or analysis. |
 | 01 | `scripts/01_validate_inventory.R` | Validates the sample sheet and writes the included, ordered inventory and any missing-peak jobs. |
 | 02 | `scripts/02_call_peaks.sh` | Calls missing PE peaks with SEACR or missing SE peaks with MACS3. |
 | 03 | `scripts/03_build_master_regions.R` | Builds the fixed blacklist-filtered master regions from replicate-supported peaks. |
