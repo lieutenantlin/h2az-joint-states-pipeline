@@ -78,9 +78,9 @@ The runner resolves its own project directory, sources the settings for tools, r
 | 02 | `scripts/02_call_peaks.sh` | Calls missing PE peaks with SEACR or missing SE peaks with MACS3. |
 | 03 | `scripts/03_build_master_regions.R` | Builds the fixed blacklist-filtered master regions from replicate-supported peaks. |
 | 04 | `scripts/04_diffbind_per_mark.R` | Counts and tests each mark against the master regions for all planned contrasts. |
-| 05 | `scripts/05_joint_states.R` | Joins mark-level calls into joint states and computes primary/interaction eligibility. |
-| 06 | `scripts/06_plot_and_export.R` | Produces figures and state-specific BED files for eligible loci. |
-| 07 | `scripts/07_review_loci.R` | Ranks representative loci for manual IGV review. |
+| 05 | `scripts/05_joint_states.R` | Joins complete per-locus joint states and computes eligibility and per-contrast changed-state counts excluding 000. |
+| 06 | `scripts/06_plot_and_export.R` | Produces figures and state-specific BED files for eligible changed loci, excluding 000. |
+| 07 | `scripts/07_review_loci.R` | Ranks representative changed-state loci for manual IGV review, excluding 000. |
 | Support | `R/pipeline_functions.R` | Supplies shared region, contrast, state, plotting, and BED-export helpers. |
 
 ## Output manifest
@@ -89,9 +89,9 @@ The runner resolves its own project directory, sources the settings for tools, r
 - `results/02_peaks/`: per-library SEACR `.stringent.bed` or MACS3 `_peaks.narrowPeak` outputs plus generated bedGraphs.
 - `results/03_master/`: fixed master RDS, four-column BED with locus IDs, three-column DiffBind counting BED, support/width summaries and `widest10.bed`.
 - `results/04_diffbind/<MARK>/`: normalized library metadata, DESeq2 object, all-locus results and MA plots for each mark.
-- `results/05_joint/`: per-locus joint calls, primary/interaction state-count tables, testability reasons and eligibility denominators.
-- `results/06_figures/`: primary and interaction PDF/PNG figures and populated per-state BEDs under `state_beds/<contrast>/`.
-- `results/07_review/`: ranked loci for manual IGV review.
+- `results/05_joint/`: `joint_locus_states.tsv` retains all per-locus calls including 000; primary/interaction state-count tables exclude 000 and include per-contrast denominators; `eligibility_summary.tsv` records eligible, excluded_000 and counted loci alongside testability reasons and eligibility rules.
+- `results/06_figures/`: primary and interaction PDF/PNG figures and populated per-state BEDs under `state_beds/<contrast>/`; neither figures nor BEDs include 000.
+- `results/07_review/`: ranked changed-state loci for manual IGV review; 000 is excluded.
 
 Implementation details that differ from the original plan's prototype notes: chromosome filtering uses `match()` against `KEEP_CHR` and coordinate sorting rather than unavailable `keepSeqlevels`; PNGs are written with a Cairo device directly rather than `ggsave()` to avoid the reported graphics API mismatch. DiffBind initialization uses a temporary four-column raw peak file with a score column; the persisted `master_regions.counting.bed` remains the planned three-column BED. DiffBind 3.20.0 does not retain the `bSubControl=FALSE` argument from `dba.count()` as an explicit object field, so the script records `dbo$bSubControl <- FALSE` before normalization. It also writes `dba_row_to_locus_id.tsv` and verifies native row ordering against DESeq2 counts before reordering results to master loci.
 
@@ -104,6 +104,10 @@ Both omitted-metadata and populated-metadata smoke projects validated 24 SE libr
 ## Interpretation and biological review
 
 `+` and `-` mean statistically detected increase/decrease (per-mark BH FDR < 0.05). `0` means **no detected change**, not demonstrated stability; `N` means untestable and is excluded from the shared eligibility denominator. No fold-change threshold is applied. H2AZac and H2AZub are analyzed as their own signals, not as stoichiometric modification fractions. With background normalization, interpretation is relative enrichment only; absolute genome-wide gain/loss claims are not supported.
+
+Most genomic sites show no detected change in any of the three marks; the `000` class can dominate and obscure informative patterns. Therefore, each contrast's state counts, figures, BEDs and review exclude `000` and focus on loci with at least one detected mark change in that contrast. The complete `joint_locus_states.tsv` still includes `000` as the per-locus source of truth.
+
+`eligible` is the number of jointly testable loci: the same shared eligible set across all four primary contrasts, or the interaction-specific set for the interaction. Eligibility and exclusion of `N` are unchanged. For each contrast, `excluded_000` counts eligible loci whose state is `000`, and `counted = eligible - excluded_000`. State `percent` is `100 * n / counted`, or `NA` when `counted` is zero; thus counted denominators can differ between contrasts even when eligibility is shared.
 
 Load state BEDs, `master_regions.bed`, and replicate bigWigs in IGV as specified in the plan. Inspect representative loci and the widest regions manually. This repository/task has not established biological agreement in IGV: that assessment requires the lab's actual data and remains the user's validation step.
 
