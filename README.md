@@ -2,6 +2,8 @@
 
 This directory is the runnable R pipeline described in `../H2A_Z_JOINT_STATES_PLAN.md`. It takes existing mm10 CUT&RUN BAMs for H2AZ, H2AZac and H2AZub and makes joint-state summaries and figures. The input table is intentionally header-only: add one row per biological antibody library to `config/samples.csv` before running.
 
+For an offline, browser-readable walkthrough of the workflow, run commands, figures and biological interpretation, open [the HTML pipeline guide](pipeline_guide.html). It is self-contained and can be printed to PDF from a browser.
+
 ## Requirements and setup
 
 Use a Linux/macOS shell and conda for the fully isolated, user-local setup. System R may instead be used with the official Bioconductor/CRAN route below. Peak-calling binaries and SEACR are stored outside this source tree.
