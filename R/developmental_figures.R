@@ -248,7 +248,7 @@ plot_developmental_frequencies <- function(counts, anchor_mark, caption,
   empty <- summary[summary$testable == 0, , drop = FALSE]
   empty$label <- ifelse(empty$cohort_total == 0, "No developmental loci", "No testable response loci")
   ggplot2::ggplot() +
-    ggplot2::geom_col(data = bars, ggplot2::aes(x = stage_f, y = percent, fill = state_f), width = 0.7) +
+    ggplot2::geom_col(data = bars, ggplot2::aes(x = stage_f, y = percent, fill = state_f), width = 0.7, show.legend = TRUE) +
     ggplot2::geom_text(data = bars, ggplot2::aes(x = stage_f, y = percent, label = label, group = state_f),
                        position = ggplot2::position_stack(vjust = 0.5), size = 2.6) +
     ggplot2::geom_text(data = summary, ggplot2::aes(x = stage_f, y = 113, label = label), size = 2.6, lineheight = 0.9) +

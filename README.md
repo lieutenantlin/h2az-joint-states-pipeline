@@ -64,7 +64,17 @@ Fill the sample sheet and run from this directory:
 bash run_pipeline.sh
 ```
 
-The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R`, `tests/inventory_selftest.R` and `tests/developmental_figures_selftest.R` before validating the user inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–4, the development-anchored figure stage, and Steps 5–7 in order, stopping on the first failure. The developmental self-test needs DESeq2 and GenomicRanges, so the R environment must be set up before any run. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R`, `tests/inventory_selftest.R` and `tests/developmental_figures_selftest.R` before validating the user inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–4, the developmental response and same-mark figure stages, and Steps 5–7 in order, stopping on the first failure. The developmental self-test needs DESeq2, GenomicRanges and ggplot2, so the R environment must be set up before any run. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+
+To rerun only the standalone same-mark figures after the existing developmental response stage has completed, run from the project root:
+
+```sh
+H2AZ_USE_CONDA_R=1
+source config/tools.sh
+"$H2AZ_RSCRIPT" scripts/plot_developmental_same_mark.R
+```
+
+This uses the completed developmental tables and row-z signals with inventory and normalization metadata; it does not refit statistics. Keep those inputs and the configured normalization consistent.
 
 ## Pipeline script guide
 
@@ -82,6 +92,7 @@ The runner resolves its own project directory, sources the settings for tools, r
 | 03 | `scripts/03_build_master_regions.R` | Builds the fixed blacklist-filtered master regions from replicate-supported peaks. |
 | 04 | `scripts/04_diffbind_per_mark.R` | Counts and tests each mark against the master regions for all planned contrasts. |
 | 04b | `scripts/plot_developmental_responses.R` | Defines developmental gain/loss cohorts from control late vs early calls and plots how Bap1 cKO affects them (same mark and cross-mark): response frequencies, replicate heatmaps and effect scatterplots. |
+| 04c | `scripts/plot_developmental_same_mark.R` | Uses completed developmental outputs to render standalone same-mark frequency, heatmap and scatter figures separately for each mark and gain/loss cohort, before Step 05. |
 | 05 | `scripts/05_joint_states.R` | Joins complete per-locus joint states and computes eligibility and per-contrast changed-state counts excluding 000. |
 | 06 | `scripts/06_plot_and_export.R` | Produces figures and state-specific BED files for eligible changed loci, excluding 000. |
 | 07 | `scripts/07_review_loci.R` | Ranks representative changed-state loci for manual IGV review, excluding 000. |
@@ -95,6 +106,7 @@ The runner resolves its own project directory, sources the settings for tools, r
 - `results/03_master/`: fixed master RDS, four-column BED with locus IDs, three-column DiffBind counting BED, support/width summaries and `widest10.bed`.
 - `results/04_diffbind/<MARK>/`: normalized library metadata, DESeq2 object, all-locus results and MA plots for each mark.
 - `results/developmental_responses/`: `developmental_cohorts.tsv` (every master locus × anchor mark, cohort `gain`/`loss`/`no_detected_change`/`untestable`); `developmental_locus_responses.tsv` (each gain/loss locus × response mark with early, late, cKO-developmental and interaction LFC/padj/state/reason); `response_frequencies.tsv` (complete anchor × cohort × response mark × stage × state grid with `n`, `cohort_total`, `testable`, `untestable`, `percent`); `<MARK>_log2_normalized_counts.tsv` and `<MARK>_row_z.tsv` (master-ordered replicate signal); `heatmap_rows.tsv` (row order and pages shared by all response marks); `scatter_summary.tsv`; figures `response_frequency_<ANCHOR>`, `developmental_vs_late_cKO_<ANCHOR>` (PDF/PNG) and `heatmap_<ANCHOR>_<gain|loss>_<RESPONSE>.pdf` with one `..._page_<NNN>.png` per page of at most 500 loci.
+- `results/developmental_same_mark/`: separate `response_frequency_<MARK>_<gain|loss>.pdf`/`.png` and `developmental_vs_late_cKO_<MARK>_<gain|loss>.pdf`/`.png`, plus `heatmap_<MARK>_<gain|loss>.pdf` and paged `heatmap_<MARK>_<gain|loss>_page_<NNN>.png` (at most 500 loci per page; empty cohorts are annotated). Tables `developmental_cohorts.tsv`, `developmental_locus_responses.tsv`, `response_frequencies.tsv`, `heatmap_rows.tsv` and `scatter_summary.tsv` document the same-mark selections and plotted data. These are additional outputs; cross-mark developmental and joint-state figures remain unchanged.
 - `results/05_joint/`: `joint_locus_states.tsv` (all per-locus calls, including 000); `state_counts_primary.tsv`/`state_counts_interaction.tsv` (exclude 000; include eligible, excluded_000, counted and percent); `testability_by_mark_contrast_reason.tsv` (per-mark testability reasons); `eligibility_summary.tsv` (per-contrast eligible, excluded_000, counted and denominator rule).
 - `results/06_figures/`: primary and interaction PDF/PNG figures and populated per-state BEDs under `state_beds/<contrast>/`; neither figures nor BEDs include 000.
 - `results/07_review/`: ranked changed-state loci for manual IGV review; 000 is excluded.
@@ -109,6 +121,8 @@ Both omitted-metadata and populated-metadata smoke projects validated 24 SE libr
 
 Development-anchored figure verification (2026-11-02): `tests/developmental_figures_selftest.R` passed with Conda R 4.5.3 / DESeq2 1.50.2 / ggplot2 4.0.3. A disposable project ran `scripts/plot_developmental_responses.R` on real saved `DESeqDataSet` objects (501 loci, 24 libraries, permuted native rows, size factors and, for H2AZac, per-locus normalization factors) with hand-authored Step 04 calls. Exported denominators, named locus/sample log2 signals, 500 + 1 heatmap pagination, empty-cohort outputs and scatter exclusions matched the constructed inputs; rendered PNGs were inspected. Reruns removed obsolete heatmap pages without touching other files; spike-in mode rendered; mismatched normalization, duplicate or missing result keys, a non-bijective row map and reordered sample IDs failed before writing figures. The calls were synthetic, so this validates execution only, not differential analysis or biology.
 
+Same-mark figure verification: all three self-test scripts passed, including scoped-plot regressions. A disposable run of the original developmental stage used real saved synthetic DESeq2 objects, followed by the standalone same-mark stage. Same-mark frequencies matched hand-computed counts (2 increased, 2 decreased and 4 no-detected-change out of 8 testable H2AZ gain loci; 4 untestable); finite `N` effects stayed in the scatter. Empty, all-untestable and globally empty cohorts rendered successfully. Expanded synthetic saved tables exercised 600-locus pagination (500 + 100), obsolete-page cleanup and preservation of unrelated files. Normalization, sample-column and duplicate-key conflicts failed before modifying outputs; original developmental and joint outputs remained untouched. Frequency, scatter, heatmap and empty/all-untestable PNGs were inspected. These checks establish software execution, not biological validity.
+
 ## Interpretation and biological review
 
 `+` and `-` mean statistically detected increase/decrease (per-mark BH FDR < 0.05). `0` means **no detected change**, not demonstrated stability; `N` means untestable and is excluded from the shared eligibility denominator. No fold-change threshold is applied. H2AZac and H2AZub are analyzed as their own signals, not as stoichiometric modification fractions. With background normalization, interpretation is relative enrichment only; absolute genome-wide gain/loss claims are not supported.
@@ -122,6 +136,8 @@ Load state BEDs, `master_regions.bed`, and replicate bigWigs in IGV as specified
 ### Development-anchored Bap1 response figures
 
 These figures ask how frequently, and in which direction, Bap1 cKO affects loci that change during normal development. For each anchor mark, control late vs early calls define developmental `gain` and `loss` cohorts; cohorts from different anchor marks overlap and must not be summed. Each cohort is then evaluated in all three response marks (same mark and cross-mark).
+
+The standalone same-mark figures present each mark and gain/loss cohort separately using the same selections, response-state definitions, denominators and normalization as the existing developmental figures. They do not replace the combined same-mark/cross-mark figures or joint-state outputs.
 
 - **Response frequencies:** early and late cKO-vs-control states within each cohort. The denominator is the response mark/stage's testable cohort loci; `0` (no detected change) stays in the denominator and `N` is reported separately, so loci are never dropped because another mark or stage is untestable. Empty cohorts show `NA` percentages, not 0% or 100%.
 - **Replicate heatmaps:** row z-scores of log2(DESeq2-normalized count + 1) from the saved Step 04 objects, columns early control, late control, early cKO, late cKO. Every cohort locus is shown in a deterministic order (anchor-mark late cKO state, then descending developmental effect) shared across the three response marks. Normalized counts are descriptive and not batch-corrected.

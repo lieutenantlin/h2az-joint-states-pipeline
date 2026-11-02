@@ -82,6 +82,7 @@
 <li><h3>Build one master locus set</h3><p>Require support from at least two replicates within each mark/group, then union those supported regions across strata, merging overlaps. Remove blacklist overlaps and keep chr1–chr19 and chrX. Save stable locus IDs and use the same regions for every mark and comparison.</p><p class="small"><code>scripts/03_build_master_regions.R</code></p></li>
 <li><h3>Count, normalize and model each mark</h3><p>DiffBind counts reads over the master loci without control subtraction. DESeq2 models four groups; an estimable multi-level batch adds a batch term (<code>~ Tissue + Condition</code> in DiffBind metadata), otherwise the design is <code>~ Condition</code>. Five contrasts produce per-locus effects and state calls. Each mark has its own analysis.</p><p class="small"><code>scripts/04_diffbind_per_mark.R</code></p></li>
 <li><h3>Follow normal developmental cohorts into cKO</h3><p>Control-development <code>+</code> loci form a gain cohort; <code>-</code> loci form a loss cohort. Join every cohort locus to all three response marks. Count cKO responses, load saved normalized replicate counts, and render the three new figure families. The saved native-row map prevents signal being assigned to the wrong locus.</p><p class="small"><code>scripts/plot_developmental_responses.R</code> · runs before Step 05, independently of joint eligibility.</p></li>
+<li><h3>Render standalone same-mark figures</h3><p>After the developmental response stage, reuse its completed tables and row-z signals to produce separate frequency, heatmap and scatter figures for each mark and gain/loss cohort. This adds outputs without replacing cross-mark developmental or joint-state figures, and does not refit statistics.</p><p class="small"><code>scripts/plot_developmental_same_mark.R</code> · runs automatically before Step 05.</p></li>
 <li><h3>Summarize joint states and prepare locus review</h3><p>Combine H2AZ/H2AZac/H2AZub calls into three-symbol states. Count eligible changed states, draw joint-state plots, export state BEDs, and rank changed loci for manual review. Complete per-locus records remain available, including <code>000</code>.</p><p class="small"><code>scripts/05_joint_states.R</code> through <code>scripts/07_review_loci.R</code></p></li>
 </ol>
 <h3>What the symbols mean</h3>
@@ -122,6 +123,10 @@ bash setup_peak_tools.sh</code></pre>
 source config/tools.sh
 "$H2AZ_RSCRIPT" scripts/plot_developmental_responses.R</code></pre>
 <p>The saved normalization mode must match <code>config/settings.R</code>. Changing the label alone does not renormalize results: restore matching settings or rerun Step 04. Obsolete paged heatmap PNGs owned by this step are removed on rerun.</p>
+<p>To rerender only the standalone same-mark figures after the developmental response stage has completed, use its saved tables and row-z signals together with the inventory and normalization metadata:</p>
+<pre><code>H2AZ_USE_CONDA_R=1
+source config/tools.sh
+"$H2AZ_RSCRIPT" scripts/plot_developmental_same_mark.R</code></pre>
 </section>
 <section id="figures">
 <h2><span class="section-no">5 · Figure reading</span>Frequency, signal and effect size answer different questions</h2>
@@ -143,6 +148,7 @@ source config/tools.sh
 <section id="outputs">
 <h2><span class="section-no">6 · Outputs</span>Start with the developmental-response folder</h2>
 <p>Open <code>results/developmental_responses/</code>. The plots and tables are generated only after you run the analysis; this guide does not embed simulated charts as real results.</p>
+<p>The separate <code>results/developmental_same_mark/</code> folder presents each mark and gain/loss cohort on its own, using the same control-based selection, normalization and mark/stage-specific testable denominators described above. These frequencies remain descriptive conditional on selection, not independent estimates of Bap1 dependence; shared control measurements can bias same-mark comparisons.</p>
 <dl class="file-list">
 <dt><code>response_frequency_&lt;ANCHOR&gt;.pdf / .png</code></dt><dd>One frequency figure per anchor mark, with all three response marks and both developmental cohorts.</dd>
 <dt><code>developmental_vs_late_cKO_&lt;ANCHOR&gt;.pdf / .png</code></dt><dd>Developmental effects versus late cKO effects, annotated with response and interaction calls.</dd>
@@ -152,6 +158,13 @@ source config/tools.sh
 <dt><code>response_frequencies.tsv</code></dt><dd>Counts, original cohort sizes, testable/untestable totals and percentages for every bar, including empty combinations.</dd>
 <dt><code>&lt;MARK&gt;_log2_normalized_counts.tsv</code> / <code>&lt;MARK&gt;_row_z.tsv</code></dt><dd>Named replicate signals in master-locus order; modification fractions are not computed.</dd>
 <dt><code>heatmap_rows.tsv</code> / <code>scatter_summary.tsv</code></dt><dd>Exact shared row/page order and scatter inclusion/exclusion counts for traceable figure reading.</dd>
+</dl>
+<h3>Standalone same-mark outputs</h3>
+<dl class="file-list">
+<dt><code>response_frequency_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png</code></dt><dd>Separate frequency figure for each mark and cohort.</dd>
+<dt><code>developmental_vs_late_cKO_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png</code></dt><dd>Separate developmental versus late cKO effect scatterplot for each mark and cohort.</dd>
+<dt><code>heatmap_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf</code></dt><dd>Multipage same-mark heatmap with matching <code>_page_&lt;NNN&gt;.png</code> images, at most 500 loci per page; empty cohorts have an annotated page.</dd>
+<dt><code>developmental_cohorts.tsv</code>, <code>developmental_locus_responses.tsv</code>, <code>response_frequencies.tsv</code>, <code>heatmap_rows.tsv</code>, <code>scatter_summary.tsv</code></dt><dd>Cohorts and same-mark response data, counts, heatmap rows and scatter summaries supporting the standalone figures.</dd>
 </dl>
 <div class="table-wrap" role="region" aria-label="Other output folders" tabindex="0"><table>
 <caption>Other folders to use during review</caption><thead><tr><th scope="col">Folder under results/</th><th scope="col">Use</th></tr></thead><tbody>
