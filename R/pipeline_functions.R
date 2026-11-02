@@ -17,6 +17,9 @@ STATE_LEVELS <- with(
               H2AZ = .state_symbols, stringsAsFactors = FALSE),
   paste0(H2AZ, H2AZac, H2AZub)
 )
+# All-zero states contain no detected joint change, but remain in per-locus records.
+NO_CHANGE_STATE <- "000"
+CHANGED_STATE_LEVELS <- setdiff(STATE_LEVELS, NO_CHANGE_STATE)
 
 # BED/GRanges and fixed-master-region integrity helpers.
 
@@ -220,22 +223,27 @@ count_states <- function(wide, loci, contrasts) {
   contrast_names <- if (is.list(contrasts)) names(contrasts) else as.character(contrasts)
   pieces <- lapply(contrast_names, function(contrast) {
     x <- wide[wide$contrast == contrast & wide$locus_id %in% loci, , drop = FALSE]
-    counts <- table(factor(x$joint, levels = STATE_LEVELS))
-    data.frame(contrast = contrast, state = STATE_LEVELS, n = as.integer(counts),
-               eligible = nrow(x), percent = if (nrow(x)) 100 * as.integer(counts) / nrow(x) else NA_real_,
+    excluded <- sum(x$joint == NO_CHANGE_STATE)
+    counted <- nrow(x) - excluded
+    counts <- table(factor(x$joint, levels = CHANGED_STATE_LEVELS))
+    data.frame(contrast = contrast, state = CHANGED_STATE_LEVELS, n = as.integer(counts),
+               eligible = nrow(x), excluded_000 = excluded, counted = counted,
+               percent = if (counted) 100 * as.integer(counts) / counted else NA_real_,
                stringsAsFactors = FALSE)
   })
   do.call(rbind, pieces)
 }
 
-plot_joint_states <- function(tab, caption = "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark)") {
+plot_joint_states <- function(tab, caption = "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark); 000 excluded") {
   if (!requireNamespace("ggplot2", quietly = TRUE)) stopf("ggplot2 is required for plotting")
-  needed <- c("contrast", "state", "n", "eligible")
+  needed <- c("contrast", "state", "n", "counted", "excluded_000")
   if (!all(needed %in% names(tab))) stopf("tab must contain: %s", paste(needed, collapse = ", "))
-  tab$state <- factor(as.character(tab$state), levels = STATE_LEVELS)
+  tab$state <- factor(as.character(tab$state), levels = CHANGED_STATE_LEVELS)
   tab$state_label <- vapply(strsplit(as.character(tab$state), "", fixed = TRUE), paste, collapse = "\n", FUN.VALUE = character(1))
-  labels <- unique(tab[c("contrast", "eligible")])
-  labels$contrast_label <- sprintf("%s (n = %d)", labels$contrast, labels$eligible)
+  labels <- unique(tab[c("contrast", "counted", "excluded_000")])
+  labels$contrast_label <- sprintf("%s (n = %s changed; %s 000 excluded)", labels$contrast,
+                                   format(labels$counted, big.mark = ",", trim = TRUE),
+                                   format(labels$excluded_000, big.mark = ",", trim = TRUE))
   tab$contrast_label <- factor(labels$contrast_label[match(tab$contrast, labels$contrast)], levels = labels$contrast_label)
   ggplot2::ggplot(tab, ggplot2::aes(x = state, y = n)) +
     ggplot2::geom_col() +
@@ -261,6 +269,7 @@ write_state_beds <- function(states, master, output_dir) {
     stale <- Sys.glob(file.path(dir, sprintf("%s_???.bed", contrast)))
     if (length(stale)) unlink(stale)
     for (state in unique(x$joint)) {
+      if (identical(state, NO_CHANGE_STATE)) next
       y <- x[x$joint == state, , drop = FALSE]
       if (!nrow(y)) next
       dir <- file.path(output_dir, contrast)

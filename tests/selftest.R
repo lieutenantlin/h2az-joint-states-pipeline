@@ -77,7 +77,36 @@ expect_equal(wide$joint[wide$locus_id == "locus1" & wide$contrast == "early_KO_v
 primary_loci <- eligible_loci(wide, PRIMARY_CONTRASTS)
 expect_equal(primary_loci, "locus1", "An N state must exclude a locus")
 tab <- count_states(wide, primary_loci, PRIMARY_CONTRASTS)
-if (nrow(tab) != 27L * 4L || any(tapply(tab$n, tab$contrast, sum) != unique(tab$eligible))) stop("State panels must contain all 27 states and sum to eligible", call. = FALSE)
-expect_equal(levels(factor(STATE_LEVELS, levels = STATE_LEVELS)), STATE_LEVELS, "Fixed state ordering must be retained")
+expect_equal(nrow(tab), 26L * 4L)
+expect_equal(unique(tab$state), CHANGED_STATE_LEVELS)
+if ("000" %in% tab$state) stop("000 must not be tabulated", call. = FALSE)
+for (ct in PRIMARY_CONTRASTS) {
+  panel <- tab[tab$contrast == ct, ]
+  expect_equal(sum(panel$n), unique(panel$counted))
+  expect_equal(unique(panel$counted + panel$excluded_000), unique(panel$eligible))
+}
+early <- tab[tab$contrast == PRIMARY_CONTRASTS[1L], ]
+expect_equal(unique(early$counted), 1L)
+expect_equal(early$percent[early$state == "+0-"], 100)
+empty <- tab[tab$contrast == PRIMARY_CONTRASTS[2L], ]
+expect_equal(unique(empty$excluded_000), 1L)
+expect_equal(unique(empty$counted), 0L)
+if (!all(is.na(empty$percent))) stop("Empty changed panels must have NA percentages", call. = FALSE)
+mixed <- data.frame(locus_id = c("a", "b", "c"), contrast = "test",
+                    joint = c("+0-", "+++", "000"))
+mixed_tab <- count_states(mixed, mixed$locus_id, "test")
+expect_equal(unique(mixed_tab$eligible), 3L)
+expect_equal(unique(mixed_tab$excluded_000), 1L)
+expect_equal(unique(mixed_tab$counted), 2L)
+expect_equal(mixed_tab$percent[mixed_tab$state == "+0-"], 50)
+bed_dir <- tempfile()
+ct <- PRIMARY_CONTRASTS[1L]
+dir.create(file.path(bed_dir, ct), recursive = TRUE)
+stale <- file.path(bed_dir, ct, paste0(ct, "_ZZZ.bed"))
+writeLines("stale", stale)
+bed_states <- data.frame(locus_id = master_locus_ids(master)[1:2], contrast = ct, joint = c("+0-", "000"))
+write_state_beds(bed_states, master, bed_dir)
+expect_equal(sort(basename(list.files(file.path(bed_dir, ct)))), paste0(ct, "_PZM.bed"))
+unlink(bed_dir, recursive = TRUE)
 expect_error(joint_states(calls[-1L, ]), "exactly every locus x five contrasts x three marks")
 cat("selftest.R: all helper invariants passed\n")
