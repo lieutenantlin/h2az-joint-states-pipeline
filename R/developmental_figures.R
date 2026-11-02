@@ -205,7 +205,7 @@ developmental_scatter_summary <- function(responses) {
 
 # Captions shared by the three figure families.
 
-developmental_caption <- function(normalization, family, multi_batch = FALSE) {
+developmental_caption <- function(normalization, family, multi_batch = FALSE, same_mark = FALSE) {
   normalization_text <- if (identical(normalization, "background")) {
     "Background normalization: relative enrichment; no absolute genome-wide gain/loss claim."
   } else {
@@ -217,7 +217,7 @@ developmental_caption <- function(normalization, family, multi_batch = FALSE) {
     "H2AZac and H2AZub are separate enrichment signals, not stoichiometric modification fractions.",
     "Descriptive frequencies conditional on control-based cohort selection (control late vs early), not an independently validated estimate of Bap1 dependence.",
     "Same-mark early/late responses and interactions reuse control samples used for selection, so noise can favor early increases, late decreases and negative interactions in gain cohorts (opposite for loss cohorts).",
-    "Cross-mark panels avoid shared libraries but may share animals and biological variation."
+    if (!same_mark) "Cross-mark panels avoid shared libraries but may share animals and biological variation."
   )
   if (identical(family, "heatmap")) {
     parts <- c(parts, "Fill: row z-score of log2(DESeq2-normalized count + 1) across all samples of the displayed mark; colors clipped to [-3, 3]. Control trajectories are selected by construction; normalized counts are descriptive, not model estimates.")
@@ -225,17 +225,19 @@ developmental_caption <- function(normalization, family, multi_batch = FALSE) {
   } else if (identical(family, "scatter")) {
     parts <- c(parts, "Same-mark x and y share late-control samples, so an apparent anticorrelation is not independent evidence of reversal. Shape = response-mark interaction (LK-EK)-(LC-EC): an altered trajectory, not evidence of direct BAP1 binding nor a failure-to-acquire classification.")
   }
-  paste(strwrap(paste(parts, collapse = " "), width = 190), collapse = "\n")
+  paste(strwrap(paste(parts, collapse = " "), width = if (same_mark) 120 else 190), collapse = "\n")
 }
 
 # Figure builders; callers own graphics devices.
 
-plot_developmental_frequencies <- function(counts, anchor_mark, caption) {
+plot_developmental_frequencies <- function(counts, anchor_mark, caption,
+                                           response_marks = MARKS, cohort_levels = DEVELOPMENTAL_COHORTS) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) stopf("ggplot2 is required for plotting")
-  x <- counts[counts$anchor_mark == anchor_mark, , drop = FALSE]
+  x <- counts[counts$anchor_mark == anchor_mark & counts$response_mark %in% response_marks &
+                counts$cohort %in% cohort_levels, , drop = FALSE]
   if (!nrow(x)) stopf("No response counts for anchor mark %s", anchor_mark)
-  x$cohort_f <- factor(unname(COHORT_LABELS[x$cohort]), levels = unname(COHORT_LABELS))
-  x$response_f <- factor(x$response_mark, levels = MARKS)
+  x$cohort_f <- factor(unname(COHORT_LABELS[x$cohort]), levels = unname(COHORT_LABELS[cohort_levels]))
+  x$response_f <- factor(x$response_mark, levels = response_marks)
   x$stage_f <- factor(unname(STAGE_LABELS[x$stage]), levels = unname(STAGE_LABELS))
   fill_levels <- unname(RESPONSE_STATE_LABELS[c("+", "-", "0")])
   x$state_f <- factor(unname(RESPONSE_STATE_LABELS[x$state]), levels = fill_levels)
@@ -304,17 +306,20 @@ plot_developmental_heatmap <- function(signal_z, rows, samples, title, caption) 
                    panel.grid = ggplot2::element_blank())
 }
 
-plot_developmental_scatter <- function(responses, summary, anchor_mark, caption) {
+plot_developmental_scatter <- function(responses, summary, anchor_mark, caption,
+                                       response_marks = MARKS, cohort_levels = DEVELOPMENTAL_COHORTS) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) stopf("ggplot2 is required for plotting")
-  x <- responses[responses$anchor_mark == anchor_mark, , drop = FALSE]
+  x <- responses[responses$anchor_mark == anchor_mark & responses$response_mark %in% response_marks &
+                   responses$cohort %in% cohort_levels, , drop = FALSE]
   x <- x[is.finite(x$developmental_lfc) & is.finite(x$late_lfc), , drop = FALSE]
-  s <- summary[summary$anchor_mark == anchor_mark, , drop = FALSE]
+  s <- summary[summary$anchor_mark == anchor_mark & summary$response_mark %in% response_marks &
+                 summary$cohort %in% cohort_levels, , drop = FALSE]
   extent <- function(v) { m <- if (length(v)) max(abs(v)) else 0; if (m > 0) m * 1.05 else 1 }
   ex <- extent(x$developmental_lfc)
   ey <- extent(x$late_lfc)
   factorize <- function(d) {
-    d$cohort_f <- factor(unname(COHORT_LABELS[d$cohort]), levels = unname(COHORT_LABELS))
-    d$response_f <- factor(d$response_mark, levels = MARKS)
+    d$cohort_f <- factor(unname(COHORT_LABELS[d$cohort]), levels = unname(COHORT_LABELS[cohort_levels]))
+    d$response_f <- factor(d$response_mark, levels = response_marks)
     d
   }
   x <- factorize(x)

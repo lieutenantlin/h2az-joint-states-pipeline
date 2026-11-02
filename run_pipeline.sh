@@ -23,6 +23,7 @@ for mark in H2AZ H2AZac H2AZub; do
 done
 # Development-anchored Bap1 response figures need only per-mark calls, not joint eligibility.
 "$H2AZ_RSCRIPT" scripts/plot_developmental_responses.R
+"$H2AZ_RSCRIPT" scripts/plot_developmental_same_mark.R
 # Join mark-level calls, export figures/BEDs, and prepare manual-review candidates.
 "$H2AZ_RSCRIPT" scripts/05_joint_states.R
 "$H2AZ_RSCRIPT" scripts/06_plot_and_export.R

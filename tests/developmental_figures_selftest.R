@@ -9,7 +9,7 @@ expect_error <- function(expr, pattern) {
   message <- tryCatch({ force(expr); NULL }, error = function(e) e$message)
   if (is.null(message) || !grepl(pattern, message, fixed = TRUE)) stop(sprintf("Expected error containing '%s', got '%s'", pattern, message), call. = FALSE)
 }
-for (pkg in c("DESeq2", "GenomicRanges")) if (!requireNamespace(pkg, quietly = TRUE)) stop(pkg, " is required", call. = FALSE)
+for (pkg in c("DESeq2", "GenomicRanges", "ggplot2")) if (!requireNamespace(pkg, quietly = TRUE)) stop(pkg, " is required", call. = FALSE)
 
 # Calls consistent with classify_state(): + / - significant, 0 not significant, N untestable.
 call_values <- function(state) {
@@ -179,4 +179,73 @@ summary <- developmental_scatter_summary(scatter_responses)
 s <- summary[summary$anchor_mark == "H2AZub" & summary$cohort == "gain" & summary$response_mark == "H2AZub", ]
 expect_equal(c(s$cohort_total, s$plotted, s$excluded_nonfinite, s$interaction_detected), c(5L, 4L, 1L, 2L),
              "Scatter excludes only nonfinite estimates and counts interactions among plotted loci")
+
+# Scoped standalone plots must retain the same data and denominators without
+# retaining facets or axis contributions from other marks and cohorts.
+frequency <- plot_developmental_frequencies(counts, "H2AZub", "",
+                                           response_marks = "H2AZub", cohort_levels = "gain")
+frequency_build <- ggplot2::ggplot_build(frequency)
+frequency_layout <- frequency_build$layout$layout
+expect_equal(nrow(frequency_layout), 1L, "Scoped frequency plot must have one facet")
+expect_equal(as.character(frequency_layout$response_f), "H2AZub")
+expect_equal(as.character(frequency_layout$cohort_f), unname(COHORT_LABELS["gain"]))
+frequency_bars <- frequency$layers[[1L]]$data
+if (any(frequency_bars$response_mark != "H2AZub" | frequency_bars$cohort != "gain")) {
+  stop("Scoped frequency bars must exclude cross-mark and loss data", call. = FALSE)
+}
+frequency_late <- frequency_bars[frequency_bars$stage == "late", ]
+expect_equal(frequency_late$n, c(1L, 1L, 2L))
+expect_equal(frequency_late$percent, c(25, 25, 50))
+expect_equal(unique(frequency_late[c("cohort_total", "testable", "untestable")]),
+             data.frame(cohort_total = 5L, testable = 4L, untestable = 1L),
+             "Scoped frequency denominators must remain unchanged")
+default_frequency <- ggplot2::ggplot_build(plot_developmental_frequencies(counts, "H2AZub", ""))
+expect_equal(nrow(default_frequency$layout$layout), 6L, "Default frequency plot must retain all six facets")
+expect_equal(sort(unique(as.character(default_frequency$layout$layout$response_f))), sort(MARKS))
+expect_equal(sort(unique(as.character(default_frequency$layout$layout$cohort_f))), sort(unname(COHORT_LABELS)))
+
+# Make excluded points dominant so filtering after axis computation is detectable.
+scoped_responses <- scatter_responses
+excluded <- scoped_responses$anchor_mark == "H2AZub" &
+  (scoped_responses$response_mark != "H2AZub" | scoped_responses$cohort == "loss")
+scoped_responses$developmental_lfc[excluded] <- 100
+scoped_responses$late_lfc[excluded] <- 200
+scoped_summary <- developmental_scatter_summary(scoped_responses)
+scoped_scatter <- plot_developmental_scatter(scoped_responses, scoped_summary, "H2AZub", "",
+                                            response_marks = "H2AZub", cohort_levels = "gain")
+scatter_build <- ggplot2::ggplot_build(scoped_scatter)
+expect_equal(nrow(scatter_build$layout$layout), 1L, "Scoped scatter must have one facet")
+expect_equal(as.character(scatter_build$layout$layout$response_f), "H2AZub")
+expect_equal(as.character(scatter_build$layout$layout$cohort_f), unname(COHORT_LABELS["gain"]))
+points <- scatter_build$data[[3L]]
+expect_equal(nrow(points), 4L, "Scoped scatter must show only finite same-mark gain points")
+expect_equal(sum(points$y == 0.4 & points$colour == unname(RESPONSE_STATE_COLORS[RESPONSE_STATE_LABELS["N"]])), 1L,
+             "A finite untestable same-mark response must remain plotted")
+expect_equal(scoped_scatter$coordinates$limits$x, c(-1.575, 1.575),
+             "Excluded marks and cohorts must not expand the scoped x range")
+expect_equal(scoped_scatter$coordinates$limits$y, c(-1.575, 1.575),
+             "Excluded marks and cohorts must not expand the scoped y range")
+default_scatter <- plot_developmental_scatter(scoped_responses, scoped_summary, "H2AZub", "")
+default_scatter_build <- ggplot2::ggplot_build(default_scatter)
+expect_equal(nrow(default_scatter_build$layout$layout), 6L, "Default scatter must retain all six facets")
+expect_equal(sort(unique(as.character(default_scatter_build$layout$layout$response_f))), sort(MARKS))
+expect_equal(sort(unique(as.character(default_scatter_build$layout$layout$cohort_f))), sort(unname(COHORT_LABELS)))
+if (max(abs(default_scatter$coordinates$limits$x)) <= 100 ||
+    max(abs(default_scatter$coordinates$limits$y)) <= 200) {
+  stop("Default scatter ranges must include all response marks and cohorts", call. = FALSE)
+}
+
+empty_frequency <- plot_developmental_frequencies(counts, "H2AZ", "",
+                                                 response_marks = "H2AZ", cohort_levels = "gain")
+empty_frequency_build <- ggplot2::ggplot_build(empty_frequency)
+expect_equal(nrow(empty_frequency_build$layout$layout), 1L, "Empty scoped frequency retains its facet")
+expect_equal(nrow(empty_frequency_build$data[[1L]]), 0L, "Empty scoped frequency has no bars")
+empty_scatter <- plot_developmental_scatter(scoped_responses, scoped_summary, "H2AZ", "",
+                                           response_marks = "H2AZ", cohort_levels = "gain")
+empty_scatter_build <- ggplot2::ggplot_build(empty_scatter)
+expect_equal(nrow(empty_scatter_build$layout$layout), 1L, "Empty scoped scatter retains its facet")
+expect_equal(nrow(empty_scatter_build$data[[3L]]), 0L, "Empty scoped scatter has no points")
+empty_summary <- scoped_summary[scoped_summary$anchor_mark == "H2AZ" & scoped_summary$cohort == "gain" &
+                                  scoped_summary$response_mark == "H2AZ", ]
+expect_equal(c(empty_summary$cohort_total, empty_summary$plotted), c(0L, 0L))
 cat("developmental_figures_selftest.R: all developmental cohort invariants passed\n")
