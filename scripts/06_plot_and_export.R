@@ -11,26 +11,29 @@ wide <- read_tsv("results/05_joint/joint_locus_states.tsv")
 primary <- read_tsv("results/05_joint/state_counts_primary.tsv")
 interaction <- read_tsv("results/05_joint/state_counts_interaction.tsv")
 summary <- read_tsv("results/05_joint/eligibility_summary.tsv")
-for (x in list(primary, interaction)) {
-  if (!all(c("contrast", "state", "n", "eligible") %in% names(x))) stop("Malformed state-count table", call. = FALSE)
-}
-primary$n <- as.numeric(primary$n); primary$eligible <- as.numeric(primary$eligible)
-interaction$n <- as.numeric(interaction$n); interaction$eligible <- as.numeric(interaction$eligible)
-# Guard against figures whose state bars disagree with their reported eligibility denominators.
-if (!all(vapply(PRIMARY_CONTRASTS, function(ct) sum(primary$n[primary$contrast == ct]) == unique(primary$eligible[primary$contrast == ct]), logical(1)))) {
-  stop("Primary state bars do not sum to their eligible denominators", call. = FALSE)
-}
-if (sum(interaction$n[interaction$contrast == "stage_genotype_interaction"]) !=
-    unique(interaction$eligible[interaction$contrast == "stage_genotype_interaction"])) {
-  stop("Interaction state bars do not sum to their eligible denominator", call. = FALSE)
+for (name in c("primary", "interaction")) {
+  x <- get(name)
+  if (!all(c("contrast", "state", "n", "eligible", "counted", "excluded_000") %in% names(x))) stop("Malformed state-count table", call. = FALSE)
+  for (column in c("n", "eligible", "counted", "excluded_000")) x[[column]] <- as.numeric(x[[column]])
+  contrasts <- if (name == "primary") PRIMARY_CONTRASTS else "stage_genotype_interaction"
+  for (ct in contrasts) {
+    panel <- x[x$contrast == ct, , drop = FALSE]
+    if (!nrow(panel) || length(unique(panel$counted)) != 1L ||
+        length(unique(panel$excluded_000)) != 1L || length(unique(panel$eligible)) != 1L ||
+        !isTRUE(sum(panel$n) == unique(panel$counted)) ||
+        !isTRUE(unique(panel$counted) + unique(panel$excluded_000) == unique(panel$eligible))) {
+      stop(sprintf("State-count denominators disagree for %s", ct), call. = FALSE)
+    }
+  }
+  assign(name, x)
 }
 out <- "results/06_figures"
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 # Carry the selected normalization's interpretive limitation into each figure caption.
 normalization_caption <- if (identical(NORMALIZATION, "background")) {
-  "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark). Background normalization: relative enrichment; no genome-wide gain/loss claim."
+  "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark); 000 excluded. Background normalization: relative enrichment; no genome-wide gain/loss claim."
 } else {
-  "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark). Calibrated spike-in normalization."
+  "+ increased, - decreased, 0 no detected change (BH FDR < 0.05, per mark); 000 excluded. Calibrated spike-in normalization."
 }
 primary_plot <- plot_joint_states(primary, caption = normalization_caption)
 grDevices::pdf(file.path(out, "joint_states_primary.pdf"), width = 13, height = 7)

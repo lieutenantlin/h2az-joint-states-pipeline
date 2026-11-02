@@ -37,12 +37,15 @@ reason_table <- as.data.frame(with(calls, table(mark, contrast, reason, useNA = 
 names(reason_table) <- c("mark", "contrast", "reason", "n")
 reason_table <- reason_table[reason_table$n > 0L, , drop = FALSE]
 # Preserve per-mark testability reasons alongside the state-count summaries.
+denominators <- unique(rbind(primary_counts, interaction_counts)[c("contrast", "excluded_000", "counted")])
 eligibility <- data.frame(contrast = c(PRIMARY_CONTRASTS, "stage_genotype_interaction"),
                           eligible = c(rep.int(length(primary_loci), length(PRIMARY_CONTRASTS)), length(interaction_loci)),
                           eligible_primary = length(primary_loci),
                           eligible_interaction = length(interaction_loci),
                           denominator_rule = c(rep.int("shared across all four primary contrasts", length(PRIMARY_CONTRASTS)), "interaction-specific"),
                           stringsAsFactors = FALSE)
+eligibility <- merge(eligibility, denominators, by = "contrast", sort = FALSE)
+eligibility <- eligibility[match(c(PRIMARY_CONTRASTS, "stage_genotype_interaction"), eligibility$contrast), ]
 out <- "results/05_joint"
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 utils::write.table(wide, file.path(out, "joint_locus_states.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
@@ -50,4 +53,4 @@ utils::write.table(primary_counts, file.path(out, "state_counts_primary.tsv"), s
 utils::write.table(interaction_counts, file.path(out, "state_counts_interaction.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
 utils::write.table(reason_table, file.path(out, "testability_by_mark_contrast_reason.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
 utils::write.table(eligibility, file.path(out, "eligibility_summary.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-cat(sprintf("Joined %d master loci; %d are eligible for every primary panel.\n", length(expected_loci), length(primary_loci)))
+cat(sprintf("Joined %d master loci; %d are eligible for every primary panel; 000 loci are excluded from each contrast's counts.\n", length(expected_loci), length(primary_loci)))

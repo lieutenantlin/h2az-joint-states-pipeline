@@ -8,12 +8,12 @@ result_tables <- lapply(MARKS, function(mark) {
   path <- file.path("results/04_diffbind", mark, paste0(mark, "_all_loci_results.tsv"))
   if (!file.exists(path)) stop(sprintf("Missing differential-results table: %s", path), call. = FALSE)
   x <- utils::read.delim(path, stringsAsFactors = FALSE, check.names = FALSE, na.strings = "NA")
-  if (!all(c("locus_id", "contrast", "mark", "baseMean", "padj") %in% names(x))) stop(sprintf("Malformed table: %s", path), call. = FALSE)
+  if (!all(c("locus_id", "contrast", "mark", "padj") %in% names(x))) stop(sprintf("Malformed table: %s", path), call. = FALSE)
   x
 })
 calls <- do.call(rbind, result_tables)
-# Review representative concordant, discordant, and no-detected-change joint-state patterns.
-review_states <- c("+++", "---", "+0-", "000")
+# Review representative concordant and discordant changed joint-state patterns.
+review_states <- c("+++", "---", "+0-")
 selected <- list()
 for (contrast in names(CONTRASTS)) for (state in review_states) {
   loci <- wide$locus_id[wide$contrast == contrast & wide$joint == state]
@@ -22,13 +22,12 @@ for (contrast in names(CONTRASTS)) for (state in review_states) {
     x <- calls[calls$locus_id == locus & calls$contrast == contrast, , drop = FALSE]
     if (nrow(x) != length(MARKS) || !setequal(x$mark, MARKS)) stop("Review input is incomplete", call. = FALSE)
     x <- x[match(MARKS, x$mark), , drop = FALSE]
-    # Changed states rank by their weakest changed-mark FDR; 000 ranks by signal strength.
-    if (identical(state, "000")) return(min(as.numeric(x$baseMean), na.rm = TRUE))
+    # Rank by the weakest changed-mark FDR.
     changed <- strsplit(state, "", fixed = TRUE)[[1L]] != "0"
     max(as.numeric(x$padj)[changed], na.rm = TRUE)
   })
   metric <- unlist(metrics, use.names = FALSE)
-  if (identical(state, "000")) order_index <- order(-metric, loci) else order_index <- order(metric, loci)
+  order_index <- order(metric, loci)
   keep <- order_index[seq_len(min(3L, length(order_index)))]
   selected[[length(selected) + 1L]] <- data.frame(contrast = contrast, state = state, locus_id = loci[keep],
                                                    rank = seq_along(keep), ranking_metric = metric[keep],
