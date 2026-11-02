@@ -9,6 +9,7 @@ export THREADS
 # Verify shared helper invariants before accepting the sample inventory.
 "$H2AZ_RSCRIPT" tests/selftest.R
 "$H2AZ_RSCRIPT" tests/inventory_selftest.R
+"$H2AZ_RSCRIPT" tests/developmental_figures_selftest.R
 "$H2AZ_RSCRIPT" scripts/01_validate_inventory.R
 # Call peaks only for included samples that lack a supplied peak path.
 JOBS=results/01_inventory/peak_jobs.tsv
@@ -20,6 +21,8 @@ fi
 for mark in H2AZ H2AZac H2AZub; do
   "$H2AZ_RSCRIPT" scripts/04_diffbind_per_mark.R "$mark"
 done
+# Development-anchored Bap1 response figures need only per-mark calls, not joint eligibility.
+"$H2AZ_RSCRIPT" scripts/plot_developmental_responses.R
 # Join mark-level calls, export figures/BEDs, and prepare manual-review candidates.
 "$H2AZ_RSCRIPT" scripts/05_joint_states.R
 "$H2AZ_RSCRIPT" scripts/06_plot_and_export.R

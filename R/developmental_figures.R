@@ -330,7 +330,7 @@ plot_developmental_scatter <- function(responses, summary, anchor_mark, caption)
     ggplot2::geom_hline(yintercept = 0, colour = "grey60") +
     ggplot2::geom_vline(xintercept = 0, colour = "grey60") +
     ggplot2::geom_point(data = x, ggplot2::aes(x = developmental_lfc, y = late_lfc, colour = late_f, shape = interaction_f),
-                        alpha = 0.5, size = 1.2) +
+                        alpha = 0.5, size = 1.2, show.legend = TRUE) +
     ggplot2::geom_text(data = s, ggplot2::aes(x = -ex, y = ey, label = label), hjust = 0, vjust = 1, size = 2.6, lineheight = 0.9) +
     ggplot2::facet_grid(cohort_f ~ response_f, drop = FALSE,
                         labeller = ggplot2::labeller(response_f = function(v) paste("Response mark:", v),
@@ -340,6 +340,8 @@ plot_developmental_scatter <- function(responses, summary, anchor_mark, caption)
                                  name = "Late cKO response") +
     ggplot2::scale_shape_manual(values = INTERACTION_SHAPES, limits = state_levels, drop = FALSE,
                                 name = "Interaction") +
+    ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(shape = 16, alpha = 1, size = 2.5)),
+                    shape = ggplot2::guide_legend(override.aes = list(colour = "black", alpha = 1, size = 2.5))) +
     ggplot2::labs(title = sprintf("%s control developmental change versus late cKO effect", anchor_mark),
                   x = sprintf("%s control late vs early log2 fold change", anchor_mark),
                   y = "Response mark late cKO vs control log2 fold change", caption = caption) +

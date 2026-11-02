@@ -62,7 +62,7 @@ Fill the sample sheet and run from this directory:
 bash run_pipeline.sh
 ```
 
-The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R` and `tests/inventory_selftest.R` before validating the user inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–7 in order and stops on the first failure. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
+The runner resolves its own project directory, sources the settings for tools, runs `tests/selftest.R`, `tests/inventory_selftest.R` and `tests/developmental_figures_selftest.R` before validating the user inventory, calls peaks only when `results/01_inventory/peak_jobs.tsv` is created, then runs Steps 3–4, the development-anchored figure stage, and Steps 5–7 in order, stopping on the first failure. The developmental self-test needs DESeq2 and GenomicRanges, so the R environment must be set up before any run. Results are written under `results/<step>/`; reruns overwrite the same outputs. Do not treat a successful synthetic self-test as biological validation.
 
 ## Pipeline script guide
 
@@ -74,14 +74,17 @@ The runner resolves its own project directory, sources the settings for tools, r
 | Support | `config/settings.R` | Defines normalization, threads, and the mm10 blacklist. |
 | Check | `tests/selftest.R` | Checks shared helper invariants before processing samples; it does not validate biological conclusions. |
 | Check | `tests/inventory_selftest.R` | Runs Step 01 in disposable projects to check all four supported headers and invalid metadata/header cases; placeholder files prove validation only, not alignment or analysis. |
+| Check | `tests/developmental_figures_selftest.R` | Checks developmental cohort membership, per-response denominators, DESeq2 row/sample mapping, heatmap pagination and scatter accounting on small fixtures. |
 | 01 | `scripts/01_validate_inventory.R` | Validates the sample sheet and writes the included, ordered inventory and any missing-peak jobs. |
 | 02 | `scripts/02_call_peaks.sh` | Calls missing PE peaks with SEACR or missing SE peaks with MACS3. |
 | 03 | `scripts/03_build_master_regions.R` | Builds the fixed blacklist-filtered master regions from replicate-supported peaks. |
 | 04 | `scripts/04_diffbind_per_mark.R` | Counts and tests each mark against the master regions for all planned contrasts. |
+| 04b | `scripts/plot_developmental_responses.R` | Defines developmental gain/loss cohorts from control late vs early calls and plots how Bap1 cKO affects them (same mark and cross-mark): response frequencies, replicate heatmaps and effect scatterplots. |
 | 05 | `scripts/05_joint_states.R` | Joins complete per-locus joint states and computes eligibility and per-contrast changed-state counts excluding 000. |
 | 06 | `scripts/06_plot_and_export.R` | Produces figures and state-specific BED files for eligible changed loci, excluding 000. |
 | 07 | `scripts/07_review_loci.R` | Ranks representative changed-state loci for manual IGV review, excluding 000. |
 | Support | `R/pipeline_functions.R` | Supplies shared region, contrast, state, plotting, and BED-export helpers. |
+| Support | `R/developmental_figures.R` | Supplies developmental cohort, response-count, replicate-signal and figure helpers for Step 04b. |
 
 ## Output manifest
 
@@ -89,6 +92,7 @@ The runner resolves its own project directory, sources the settings for tools, r
 - `results/02_peaks/`: per-library SEACR `.stringent.bed` or MACS3 `_peaks.narrowPeak` outputs plus generated bedGraphs.
 - `results/03_master/`: fixed master RDS, four-column BED with locus IDs, three-column DiffBind counting BED, support/width summaries and `widest10.bed`.
 - `results/04_diffbind/<MARK>/`: normalized library metadata, DESeq2 object, all-locus results and MA plots for each mark.
+- `results/developmental_responses/`: `developmental_cohorts.tsv` (every master locus × anchor mark, cohort `gain`/`loss`/`no_detected_change`/`untestable`); `developmental_locus_responses.tsv` (each gain/loss locus × response mark with early, late, cKO-developmental and interaction LFC/padj/state/reason); `response_frequencies.tsv` (complete anchor × cohort × response mark × stage × state grid with `n`, `cohort_total`, `testable`, `untestable`, `percent`); `<MARK>_log2_normalized_counts.tsv` and `<MARK>_row_z.tsv` (master-ordered replicate signal); `heatmap_rows.tsv` (row order and pages shared by all response marks); `scatter_summary.tsv`; figures `response_frequency_<ANCHOR>`, `developmental_vs_late_cKO_<ANCHOR>` (PDF/PNG) and `heatmap_<ANCHOR>_<gain|loss>_<RESPONSE>.pdf` with one `..._page_<NNN>.png` per page of at most 500 loci.
 - `results/05_joint/`: `joint_locus_states.tsv` (all per-locus calls, including 000); `state_counts_primary.tsv`/`state_counts_interaction.tsv` (exclude 000; include eligible, excluded_000, counted and percent); `testability_by_mark_contrast_reason.tsv` (per-mark testability reasons); `eligibility_summary.tsv` (per-contrast eligible, excluded_000, counted and denominator rule).
 - `results/06_figures/`: primary and interaction PDF/PNG figures and populated per-state BEDs under `state_beds/<contrast>/`; neither figures nor BEDs include 000.
 - `results/07_review/`: ranked changed-state loci for manual IGV review; 000 is excluded.
@@ -101,6 +105,8 @@ Optional-metadata verification (2026-10-26): `tests/selftest.R` and `tests/inven
 
 Both omitted-metadata and populated-metadata smoke projects validated 24 SE libraries and retained 200 master loci with the bundled blacklist. The exact deterministic counts (`20 + ((window_index + replicate_index) %% 7)`, plus eight cKO reads in even windows) completed counting/background normalization but failed DESeq2's dispersion fit in both modes because estimates were too close to the minimum. A supplemental fixture used `set.seed(261026)` and negative-binomial counts with those means (`size = 20`), retaining the same 200 windows and 2,000 background reads per library. It completed real Steps 01, 03 and 04 for H2AZ in both modes: saved DESeq2 sample IDs matched the validated H2AZ inventory, the designs were `~ Condition` without batch and `~ Tissue + Condition` with balanced A/B batches, and every retained locus had all five contrasts. Temporary projects were removed; production results were untouched. These synthetic checks establish execution, not biological validity.
 
+Development-anchored figure verification (2026-11-02): `tests/developmental_figures_selftest.R` passed with Conda R 4.5.3 / DESeq2 1.50.2 / ggplot2 4.0.3. A disposable project ran `scripts/plot_developmental_responses.R` on real saved `DESeqDataSet` objects (501 loci, 24 libraries, permuted native rows, size factors and, for H2AZac, per-locus normalization factors) with hand-authored Step 04 calls. Exported denominators, named locus/sample log2 signals, 500 + 1 heatmap pagination, empty-cohort outputs and scatter exclusions matched the constructed inputs; rendered PNGs were inspected. Reruns removed obsolete heatmap pages without touching other files; spike-in mode rendered; mismatched normalization, duplicate or missing result keys, a non-bijective row map and reordered sample IDs failed before writing figures. The calls were synthetic, so this validates execution only, not differential analysis or biology.
+
 ## Interpretation and biological review
 
 `+` and `-` mean statistically detected increase/decrease (per-mark BH FDR < 0.05). `0` means **no detected change**, not demonstrated stability; `N` means untestable and is excluded from the shared eligibility denominator. No fold-change threshold is applied. H2AZac and H2AZub are analyzed as their own signals, not as stoichiometric modification fractions. With background normalization, interpretation is relative enrichment only; absolute genome-wide gain/loss claims are not supported.
@@ -110,6 +116,16 @@ Most genomic sites show no detected change in any of the three marks; the `000` 
 `eligible` is the number of jointly testable loci: the same shared eligible set across all four primary contrasts, or the interaction-specific set for the interaction. Eligibility and exclusion of `N` are unchanged. For each contrast, `excluded_000` counts eligible loci whose state is `000`, and `counted = eligible - excluded_000`. State `percent` is `100 * n / counted`, or `NA` when `counted` is zero; thus counted denominators can differ between contrasts even when eligibility is shared.
 
 Load state BEDs, `master_regions.bed`, and replicate bigWigs in IGV as specified in the plan. Inspect representative loci and the widest regions manually. This repository/task has not established biological agreement in IGV: that assessment requires the lab's actual data and remains the user's validation step.
+
+### Development-anchored Bap1 response figures
+
+These figures ask how frequently, and in which direction, Bap1 cKO affects loci that change during normal development. For each anchor mark, control late vs early calls define developmental `gain` and `loss` cohorts; cohorts from different anchor marks overlap and must not be summed. Each cohort is then evaluated in all three response marks (same mark and cross-mark).
+
+- **Response frequencies:** early and late cKO-vs-control states within each cohort. The denominator is the response mark/stage's testable cohort loci; `0` (no detected change) stays in the denominator and `N` is reported separately, so loci are never dropped because another mark or stage is untestable. Empty cohorts show `NA` percentages, not 0% or 100%.
+- **Replicate heatmaps:** row z-scores of log2(DESeq2-normalized count + 1) from the saved Step 04 objects, columns early control, late control, early cKO, late cKO. Every cohort locus is shown in a deterministic order (anchor-mark late cKO state, then descending developmental effect) shared across the three response marks. Normalized counts are descriptive and not batch-corrected.
+- **Effect scatterplots:** anchor control developmental LFC versus response-mark late cKO LFC; color is the late cKO state and shape the response-mark stage × genotype interaction.
+
+Cohort selection and the same-mark cKO comparisons reuse control samples. Noise in selection therefore favors early increases, late decreases and negative interactions in gain cohorts (the reverse in loss cohorts), and same-mark scatterplots can show an anticorrelation without any biological reversal. Read these outputs as descriptive frequencies conditional on selection, not an independent estimate of Bap1 dependence. Cross-mark panels avoid shared libraries but may share animals. A significant interaction indicates an altered trajectory; inspect all four groups before calling it failure to acquire, premature gain or reversal. None of these outputs shows direct BAP1 binding.
 
 ## Sources
 
