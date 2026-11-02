@@ -223,7 +223,7 @@ developmental_caption <- function(normalization, family, multi_batch = FALSE) {
     parts <- c(parts, "Fill: row z-score of log2(DESeq2-normalized count + 1) across all samples of the displayed mark; colors clipped to [-3, 3]. Control trajectories are selected by construction; normalized counts are descriptive, not model estimates.")
     if (multi_batch) parts <- c(parts, "Multiple batches present: displayed normalized counts are not batch-corrected.")
   } else if (identical(family, "scatter")) {
-    parts <- c(parts, "Same-mark x and y share late-control samples, so an apparent anticorrelation is not independent evidence of reversal. Shape = response-mark interaction (LK-EK)-(LC-EC): an altered trajectory, not evidence of direct BAP1 binding.")
+    parts <- c(parts, "Same-mark x and y share late-control samples, so an apparent anticorrelation is not independent evidence of reversal. Shape = response-mark interaction (LK-EK)-(LC-EC): an altered trajectory, not evidence of direct BAP1 binding nor a failure-to-acquire classification.")
   }
   paste(strwrap(paste(parts, collapse = " "), width = 190), collapse = "\n")
 }
