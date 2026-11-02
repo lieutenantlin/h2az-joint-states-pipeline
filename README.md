@@ -89,7 +89,7 @@ The runner resolves its own project directory, sources the settings for tools, r
 - `results/02_peaks/`: per-library SEACR `.stringent.bed` or MACS3 `_peaks.narrowPeak` outputs plus generated bedGraphs.
 - `results/03_master/`: fixed master RDS, four-column BED with locus IDs, three-column DiffBind counting BED, support/width summaries and `widest10.bed`.
 - `results/04_diffbind/<MARK>/`: normalized library metadata, DESeq2 object, all-locus results and MA plots for each mark.
-- `results/05_joint/`: `joint_locus_states.tsv` retains all per-locus calls including 000; primary/interaction state-count tables exclude 000 and include per-contrast denominators; `eligibility_summary.tsv` records eligible, excluded_000 and counted loci alongside testability reasons and eligibility rules.
+- `results/05_joint/`: `joint_locus_states.tsv` (all per-locus calls, including 000); `state_counts_primary.tsv`/`state_counts_interaction.tsv` (exclude 000; include eligible, excluded_000, counted and percent); `testability_by_mark_contrast_reason.tsv` (per-mark testability reasons); `eligibility_summary.tsv` (per-contrast eligible, excluded_000, counted and denominator rule).
 - `results/06_figures/`: primary and interaction PDF/PNG figures and populated per-state BEDs under `state_beds/<contrast>/`; neither figures nor BEDs include 000.
 - `results/07_review/`: ranked changed-state loci for manual IGV review; 000 is excluded.
 
