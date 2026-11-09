@@ -90,7 +90,7 @@ render_view <- function(all_peaks = FALSE) {
   write_tsv(manifest, "heatmap_rows.tsv", view_out)
   write_tsv(scatter_summary, "scatter_summary.tsv", view_out)
 
-  # Remove only this view's paged heatmaps so smaller cohorts cannot leave obsolete pages.
+  # Heatmaps are exported only as compiled multipage PDFs; remove legacy per-page PNG/SVG files from this view.
   page_pattern <- sprintf("^heatmap_(%s)_(%s)_(%s)_page_[0-9]{3,}\\.(png|svg)$",
                           paste(MARKS, collapse = "|"), paste(cohort_levels, collapse = "|"),
                           paste(MARKS, collapse = "|"))
@@ -130,11 +130,6 @@ render_view <- function(all_peaks = FALSE) {
             title, developmental_caption(NORMALIZATION, "heatmap", multi_batch, all_peaks = all_peaks))
         })
         render_pdf(file.path(view_out, paste0(stem, ".pdf")), plots, 14, 10)
-        for (i in seq_along(pages)) {
-          page_stem <- file.path(view_out, sprintf("%s_page_%03d", stem, pages[[i]]))
-          render_png(paste0(page_stem, ".png"), plots[[i]], 2100, 1500)
-          render_developmental_svg(paste0(page_stem, ".svg"), plots[[i]], 14, 10)
-        }
       }
     }
   }

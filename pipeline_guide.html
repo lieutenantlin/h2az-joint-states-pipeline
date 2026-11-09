@@ -122,7 +122,7 @@ bash setup_peak_tools.sh</code></pre>
 <pre><code>H2AZ_USE_CONDA_R=1
 source config/tools.sh
 "$H2AZ_RSCRIPT" scripts/plot_developmental_responses.R</code></pre>
-<p>The saved normalization mode must match <code>config/settings.R</code>. Changing the label alone does not renormalize results: restore matching settings or rerun Step 04. Obsolete paged heatmap PNG and SVG files owned by the rendered view are removed on rerun.</p>
+<p>The saved normalization mode must match <code>config/settings.R</code>. Changing the label alone does not renormalize results: restore matching settings or rerun Step 04. Heatmaps are written only as compiled multipage PDFs; legacy per-page heatmap PNG and SVG files owned by the rendered view are removed on rerun.</p>
 <p>To rerender only the standalone same-mark figures after the developmental response stage has completed, use its saved tables and row-z signals together with the inventory and normalization metadata:</p>
 <pre><code>H2AZ_USE_CONDA_R=1
 source config/tools.sh
@@ -154,7 +154,7 @@ source config/tools.sh
 <dl class="file-list">
 <dt><code>response_frequency_&lt;ANCHOR&gt;.pdf / .png / .svg</code></dt><dd>One frequency figure per anchor mark, with all three response marks and both developmental cohorts.</dd>
 <dt><code>developmental_vs_late_cKO_&lt;ANCHOR&gt;.pdf / .png / .svg</code></dt><dd>Developmental effects versus late cKO effects, annotated with response and interaction calls.</dd>
-<dt><code>heatmap_&lt;ANCHOR&gt;_&lt;gain|loss&gt;_&lt;RESPONSE&gt;.pdf</code></dt><dd>Multipage replicate signal, with matching paged PNG and SVG images. Empty cohorts still receive an explanatory page.</dd>
+<dt><code>heatmap_&lt;ANCHOR&gt;_&lt;gain|loss&gt;_&lt;RESPONSE&gt;.pdf</code></dt><dd>Multipage replicate signal (compiled PDF only). Empty cohorts still receive an explanatory page.</dd>
 <dt><code>developmental_cohorts.tsv</code></dt><dd>Every master locus × anchor mark, including no-detected-change and untestable developmental calls.</dd>
 <dt><code>developmental_locus_responses.tsv</code></dt><dd>Gain/loss membership joined to each response mark, with early, late, cKO-developmental and interaction effects, adjusted P values, states and reasons.</dd>
 <dt><code>response_frequencies.tsv</code></dt><dd>Counts, original cohort sizes, testable/untestable totals and percentages for every bar, including empty combinations.</dd>
@@ -165,7 +165,7 @@ source config/tools.sh
 <dl class="file-list">
 <dt><code>response_frequency_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png / .svg</code></dt><dd>Separate frequency figure for each mark and cohort.</dd>
 <dt><code>developmental_vs_late_cKO_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png / .svg</code></dt><dd>Separate developmental versus late cKO effect scatterplot for each mark and cohort.</dd>
-<dt><code>heatmap_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf</code></dt><dd>Multipage same-mark heatmap with paged PNG and SVG images, at most 500 loci per page; empty cohorts have an annotated page.</dd>
+<dt><code>heatmap_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf</code></dt><dd>Multipage same-mark heatmap (compiled PDF only), at most 500 loci per page; empty cohorts have an annotated page.</dd>
 <dt><code>developmental_cohorts.tsv</code>, <code>developmental_locus_responses.tsv</code>, <code>response_frequencies.tsv</code>, <code>heatmap_rows.tsv</code>, <code>scatter_summary.tsv</code></dt><dd>Cohorts and same-mark response data, counts, heatmap rows and scatter summaries supporting the standalone figures.</dd>
 </dl>
 <p>Optional <code>all_peaks/</code> directories contain the same five tables and all-peak figures, with <code>all</code> in heatmap and same-mark figure names. Normalized matrices remain in the parent response directory. PNG and SVG output require Cairo support.</p>

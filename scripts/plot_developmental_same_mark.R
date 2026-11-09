@@ -137,7 +137,7 @@ render_view <- function(view, out) {
   write_tsv(counts, "response_frequencies.tsv")
   write_tsv(manifest, "heatmap_rows.tsv")
   write_tsv(summary, "scatter_summary.tsv")
-  # Only remove paged exports owned by this view.
+  # Heatmaps are exported only as compiled multipage PDFs; remove legacy per-page PNG/SVG files from this view.
   cohort_pattern <- if (all_peaks) "all" else "gain|loss"
   pattern <- sprintf("^heatmap_(%s)_(%s)_page_[0-9]{3,}\\.(png|svg)$", paste(MARKS, collapse = "|"), cohort_pattern)
   stale <- list.files(out, pattern = pattern, full.names = TRUE)
@@ -168,11 +168,6 @@ render_view <- function(view, out) {
       sprintf("%s signal at its %s (page %d of %d)", mark, label, page, length(pages)), caption("heatmap")))
     stem <- sprintf("heatmap_%s_%s", mark, cohort)
     render_pdf(file.path(out, paste0(stem, ".pdf")), plots, 14, 10)
-    for (i in seq_along(pages)) {
-      page_stem <- sprintf("%s_page_%03d", stem, pages[[i]])
-      render_png(file.path(out, paste0(page_stem, ".png")), plots[[i]], 2100, 1500)
-      render_developmental_svg(file.path(out, paste0(page_stem, ".svg")), plots[[i]], 14, 10)
-    }
   }
 }
 out <- "results/developmental_same_mark"
