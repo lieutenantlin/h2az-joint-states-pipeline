@@ -122,11 +122,12 @@ bash setup_peak_tools.sh</code></pre>
 <pre><code>H2AZ_USE_CONDA_R=1
 source config/tools.sh
 "$H2AZ_RSCRIPT" scripts/plot_developmental_responses.R</code></pre>
-<p>The saved normalization mode must match <code>config/settings.R</code>. Changing the label alone does not renormalize results: restore matching settings or rerun Step 04. Obsolete paged heatmap PNGs owned by this step are removed on rerun.</p>
+<p>The saved normalization mode must match <code>config/settings.R</code>. Changing the label alone does not renormalize results: restore matching settings or rerun Step 04. Obsolete paged heatmap PNG and SVG files owned by the rendered view are removed on rerun.</p>
 <p>To rerender only the standalone same-mark figures after the developmental response stage has completed, use its saved tables and row-z signals together with the inventory and normalization metadata:</p>
 <pre><code>H2AZ_USE_CONDA_R=1
 source config/tools.sh
 "$H2AZ_RSCRIPT" scripts/plot_developmental_same_mark.R</code></pre>
+<p>To add all-peak views, set <code>H2AZ_DEVELOPMENTAL_ALL_PEAKS=1</code> for both commands or the pipeline runner. Run the response stage first. Outputs go in each stage's <code>all_peaks/</code> directory; the default gain/loss views are still produced. Unset or <code>0</code> skips the optional views without deleting previous optional outputs.</p>
 </section>
 <section id="figures">
 <h2><span class="section-no">5 · Figure reading</span>Frequency, signal and effect size answer different questions</h2>
@@ -141,6 +142,7 @@ source config/tools.sh
 <h3>Effect scatterplots: which directions and magnitudes occur?</h3>
 <p>The horizontal axis is the anchor mark’s control-development LFC. The vertical axis is the response mark’s late-cKO LFC. Color denotes late response state; upward triangle, downward triangle, circle and cross denote positive, negative, no-detected and untestable interaction calls, respectively.</p>
 <p>Only nonfinite x/y estimates are omitted. A finite estimate with state <code>N</code> stays visible as untestable. Panel annotations report exclusions and interaction calls. These plots are descriptive; the pipeline does not fit a reversal regression or test a correlation.</p>
+<p>In the optional all-peak view, every master locus in the developmental comparison is included. Scatter colors show detected significance in the developmental and late cKO comparisons; shapes show which comparisons are untestable. Untestable does not mean established nonsignificant. Response frequencies exclude only response-untestable calls from their denominators.</p>
 <h3>Existing joint-state figures: what combinations change?</h3>
 <p>Read three-symbol codes in <strong>H2AZ / H2AZac / H2AZub</strong> order. For example, <code>+0-</code> means increased total H2AZ, no detected H2AZac change and decreased H2AZub in that contrast. It does not measure modification fractions. State strings in the TSVs use the ASCII hyphen <code>-</code>, not a typographic minus sign.</p>
 <div class="note"><p><strong>Do not mix the denominators.</strong> Joint-state primary panels share loci testable in all three marks across all four primary contrasts, then exclude <code>000</code> separately in each contrast. Their percentages are among changed loci. The interaction has its own jointly testable set. Developmental-response bars instead retain no-change responses within the selected cohort and use mark/stage-specific testability.</p></div>
@@ -150,9 +152,9 @@ source config/tools.sh
 <p>Open <code>results/developmental_responses/</code>. The plots and tables are generated only after you run the analysis; this guide does not embed simulated charts as real results.</p>
 <p>The separate <code>results/developmental_same_mark/</code> folder presents each mark and gain/loss cohort on its own, using the same control-based selection, normalization and mark/stage-specific testable denominators described above. These frequencies remain descriptive conditional on selection, not independent estimates of Bap1 dependence; shared control measurements can bias same-mark comparisons.</p>
 <dl class="file-list">
-<dt><code>response_frequency_&lt;ANCHOR&gt;.pdf / .png</code></dt><dd>One frequency figure per anchor mark, with all three response marks and both developmental cohorts.</dd>
-<dt><code>developmental_vs_late_cKO_&lt;ANCHOR&gt;.pdf / .png</code></dt><dd>Developmental effects versus late cKO effects, annotated with response and interaction calls.</dd>
-<dt><code>heatmap_&lt;ANCHOR&gt;_&lt;gain|loss&gt;_&lt;RESPONSE&gt;.pdf</code></dt><dd>Multipage replicate signal. Matching PNG names end in <code>_page_001.png</code>, <code>_page_002.png</code>, and so on. Empty cohorts still receive an explanatory page.</dd>
+<dt><code>response_frequency_&lt;ANCHOR&gt;.pdf / .png / .svg</code></dt><dd>One frequency figure per anchor mark, with all three response marks and both developmental cohorts.</dd>
+<dt><code>developmental_vs_late_cKO_&lt;ANCHOR&gt;.pdf / .png / .svg</code></dt><dd>Developmental effects versus late cKO effects, annotated with response and interaction calls.</dd>
+<dt><code>heatmap_&lt;ANCHOR&gt;_&lt;gain|loss&gt;_&lt;RESPONSE&gt;.pdf</code></dt><dd>Multipage replicate signal, with matching paged PNG and SVG images. Empty cohorts still receive an explanatory page.</dd>
 <dt><code>developmental_cohorts.tsv</code></dt><dd>Every master locus × anchor mark, including no-detected-change and untestable developmental calls.</dd>
 <dt><code>developmental_locus_responses.tsv</code></dt><dd>Gain/loss membership joined to each response mark, with early, late, cKO-developmental and interaction effects, adjusted P values, states and reasons.</dd>
 <dt><code>response_frequencies.tsv</code></dt><dd>Counts, original cohort sizes, testable/untestable totals and percentages for every bar, including empty combinations.</dd>
@@ -161,11 +163,12 @@ source config/tools.sh
 </dl>
 <h3>Standalone same-mark outputs</h3>
 <dl class="file-list">
-<dt><code>response_frequency_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png</code></dt><dd>Separate frequency figure for each mark and cohort.</dd>
-<dt><code>developmental_vs_late_cKO_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png</code></dt><dd>Separate developmental versus late cKO effect scatterplot for each mark and cohort.</dd>
-<dt><code>heatmap_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf</code></dt><dd>Multipage same-mark heatmap with matching <code>_page_&lt;NNN&gt;.png</code> images, at most 500 loci per page; empty cohorts have an annotated page.</dd>
+<dt><code>response_frequency_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png / .svg</code></dt><dd>Separate frequency figure for each mark and cohort.</dd>
+<dt><code>developmental_vs_late_cKO_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf / .png / .svg</code></dt><dd>Separate developmental versus late cKO effect scatterplot for each mark and cohort.</dd>
+<dt><code>heatmap_&lt;MARK&gt;_&lt;gain|loss&gt;.pdf</code></dt><dd>Multipage same-mark heatmap with paged PNG and SVG images, at most 500 loci per page; empty cohorts have an annotated page.</dd>
 <dt><code>developmental_cohorts.tsv</code>, <code>developmental_locus_responses.tsv</code>, <code>response_frequencies.tsv</code>, <code>heatmap_rows.tsv</code>, <code>scatter_summary.tsv</code></dt><dd>Cohorts and same-mark response data, counts, heatmap rows and scatter summaries supporting the standalone figures.</dd>
 </dl>
+<p>Optional <code>all_peaks/</code> directories contain the same five tables and all-peak figures, with <code>all</code> in heatmap and same-mark figure names. Normalized matrices remain in the parent response directory. PNG and SVG output require Cairo support.</p>
 <div class="table-wrap" role="region" aria-label="Other output folders" tabindex="0"><table>
 <caption>Other folders to use during review</caption><thead><tr><th scope="col">Folder under results/</th><th scope="col">Use</th></tr></thead><tbody>
 <tr><th scope="row"><code>01_inventory/</code></th><td>Check the included libraries and validated metadata.</td></tr>
