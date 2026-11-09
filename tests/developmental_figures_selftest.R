@@ -202,7 +202,7 @@ expect_equal(unique(frequency_late[c("cohort_total", "testable", "untestable")])
 default_frequency <- ggplot2::ggplot_build(plot_developmental_frequencies(counts, "H2AZub", ""))
 expect_equal(nrow(default_frequency$layout$layout), 6L, "Default frequency plot must retain all six facets")
 expect_equal(sort(unique(as.character(default_frequency$layout$layout$response_f))), sort(MARKS))
-expect_equal(sort(unique(as.character(default_frequency$layout$layout$cohort_f))), sort(unname(COHORT_LABELS)))
+expect_equal(sort(unique(as.character(default_frequency$layout$layout$cohort_f))), sort(unname(COHORT_LABELS[DEVELOPMENTAL_COHORTS])))
 
 # Make excluded points dominant so filtering after axis computation is detectable.
 scoped_responses <- scatter_responses
@@ -229,7 +229,7 @@ default_scatter <- plot_developmental_scatter(scoped_responses, scoped_summary, 
 default_scatter_build <- ggplot2::ggplot_build(default_scatter)
 expect_equal(nrow(default_scatter_build$layout$layout), 6L, "Default scatter must retain all six facets")
 expect_equal(sort(unique(as.character(default_scatter_build$layout$layout$response_f))), sort(MARKS))
-expect_equal(sort(unique(as.character(default_scatter_build$layout$layout$cohort_f))), sort(unname(COHORT_LABELS)))
+expect_equal(sort(unique(as.character(default_scatter_build$layout$layout$cohort_f))), sort(unname(COHORT_LABELS[DEVELOPMENTAL_COHORTS])))
 if (max(abs(default_scatter$coordinates$limits$x)) <= 100 ||
     max(abs(default_scatter$coordinates$limits$y)) <= 200) {
   stop("Default scatter ranges must include all response marks and cohorts", call. = FALSE)
@@ -248,4 +248,56 @@ expect_equal(nrow(empty_scatter_build$data[[3L]]), 0L, "Empty scoped scatter has
 empty_summary <- scoped_summary[scoped_summary$anchor_mark == "H2AZ" & scoped_summary$cohort == "gain" &
                                   scoped_summary$response_mark == "H2AZ", ]
 expect_equal(c(empty_summary$cohort_total, empty_summary$plotted), c(0L, 0L))
+# All-peak display membership preserves every master locus and both comparison states.
+all_calls <- make_calls(ids, list(
+  "H2AZub|control_late_vs_early" = c("+", "-", "0", "0", "N", "0", "N", "+"),
+  "H2AZac|late_KO_vs_control" = c("+", "0", "-", "0", "0", "N", "N", "N")))
+dev_hit <- which(all_calls$mark == "H2AZub" & all_calls$contrast == DEVELOPMENTAL_CONTRAST)
+late_hit <- which(all_calls$mark == "H2AZac" & all_calls$contrast == "late_KO_vs_control")
+all_calls$log2FoldChange[dev_hit[4:7]] <- c(0, .02, -.02, .03)
+all_calls$log2FoldChange[late_hit[4:8]] <- c(.01, .1, .04, -.04, NA)
+all_cohorts <- developmental_cohorts(all_calls, ids)
+all_responses <- developmental_responses(all_calls, all_cohorts, all_peaks = TRUE)
+for (a in MARKS) for (r in MARKS) {
+  selected <- all_responses[all_responses$anchor_mark == a & all_responses$response_mark == r, ]
+  expect_equal(selected$locus_id, ids, "All-peak selection must preserve master order")
+  expect_equal(selected$cohort, rep("all", length(ids)))
+  expect_equal(selected$developmental_state, all_cohorts$developmental_state[all_cohorts$anchor_mark == a])
+  expect_equal(selected$developmental_reason, all_cohorts$developmental_reason[all_cohorts$anchor_mark == a])
+}
+expect_equal(classify_state(1, .01, ALPHA), "0", "FDR equal to alpha is not significant")
+all_summary <- developmental_scatter_summary(all_responses, "all")
+cross_summary <- all_summary[all_summary$anchor_mark == "H2AZub" & all_summary$response_mark == "H2AZac", ]
+expect_equal(unname(unlist(cross_summary[c("cohort_total", "plotted", "excluded_nonfinite", "neither_significant",
+                                         "developmental_only", "genotype_only", "both_significant",
+                                         "developmental_untestable", "genotype_untestable")])),
+             c(8L, 7L, 1L, 4L, 1L, 1L, 1L, 2L, 2L))
+all_plot <- plot_developmental_scatter(all_responses, all_summary, "H2AZub", "", cohort_levels = "all")
+all_build <- ggplot2::ggplot_build(all_plot)
+expect_equal(nrow(all_build$layout$layout), 3L)
+cross_panel <- all_build$layout$layout$PANEL[all_build$layout$layout$response_f == "H2AZac"]
+plotted <- all_build$data[[3L]][all_build$data[[3L]]$PANEL == cross_panel, ]
+expected_colors <- c("#CC79A7", "#0072B2", "#D55E00", "#999999", "#999999", "#999999", "#999999")
+expected_shapes <- c(16, 16, 16, 16, 17, 15, 4)
+for (i in seq_len(7L)) {
+  point <- plotted[plotted$x == all_calls$log2FoldChange[dev_hit[i]] &
+                     plotted$y == all_calls$log2FoldChange[late_hit[i]], ]
+  expect_equal(nrow(point), 1L, "Every finite locus must appear at its actual coordinates")
+  expect_equal(point$colour, expected_colors[i])
+  expect_equal(point$shape, expected_shapes[i])
+}
+all_counts <- developmental_response_counts(all_responses, "all")
+all_n_full <- developmental_response_counts(developmental_responses(all_n, developmental_cohorts(all_n, ids), TRUE), "all")
+all_n_row <- all_n_full[all_n_full$anchor_mark == "H2AZ" & all_n_full$response_mark == "H2AZ" & all_n_full$stage == "late", ]
+expect_equal(c(unique(all_n_row$cohort_total), unique(all_n_row$testable), unique(all_n_row$untestable)), c(8L, 0L, 8L))
+if (!all(is.na(all_n_row$percent))) stop("All-peak all-N response percentages must be NA", call. = FALSE)
+all_frequency <- ggplot2::ggplot_build(plot_developmental_frequencies(all_counts, "H2AZub", "", cohort_levels = "all"))
+expect_equal(nrow(all_frequency$layout$layout), 3L)
+many_all <- developmental_responses(many_calls, developmental_cohorts(many_calls, many), TRUE)
+many_manifest <- heatmap_row_manifest(many_all, cohort_levels = "all")
+for (a in MARKS) {
+  rows <- many_manifest[many_manifest$anchor_mark == a, ]
+  expect_equal(as.integer(table(rows$page)), c(500L, 1L))
+  expect_equal(sort(rows$locus_id), sort(many))
+}
 cat("developmental_figures_selftest.R: all developmental cohort invariants passed\n")
