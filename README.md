@@ -76,6 +76,10 @@ source config/tools.sh
 
 This uses the completed developmental tables and row-z signals with inventory and normalization metadata; it does not refit statistics. Keep those inputs and the configured normalization consistent.
 
+Set `H2AZ_DEVELOPMENTAL_ALL_PEAKS=1` for both developmental plotting stages (or the pipeline runner) to additionally render every master locus in the developmental comparison. The default gain/loss views remain unchanged; optional tables and figures are written under each stage's `all_peaks/` directory. Run the response stage with the option enabled before the same-mark stage. Unset or `0` skips optional outputs without removing older ones.
+
+All-peak scatter colors describe detected significance in the developmental and late cKO comparisons; shapes identify untestable comparisons, which are not established nonsignificant. Finite untestable effects remain plotted. Frequency denominators exclude only response-stage untestable calls. Developmental frequency and scatter figures are exported as PDF, PNG and SVG; heatmaps use multipage PDF and paged PNG/SVG. Cairo support is required.
+
 ## Pipeline script guide
 
 | Order | Path | Role |

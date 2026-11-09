@@ -1,6 +1,7 @@
 # Runtime analysis settings: normalization, worker count, and the required mm10 blacklist.
 PROJECT_ROOT <- normalizePath(getwd(), mustWork = TRUE)
 NORMALIZATION <- "background" # Change to "spikein" only with validated calibration BAMs in every row.
+DEVELOPMENTAL_ALL_PEAKS <- identical(Sys.getenv("H2AZ_DEVELOPMENTAL_ALL_PEAKS", "0"), "1")
 THREADS <- suppressWarnings(as.integer(Sys.getenv("THREADS", "")))
 if (length(THREADS) != 1L || is.na(THREADS) || THREADS < 1L) {
   THREADS <- parallel::detectCores(logical = FALSE)

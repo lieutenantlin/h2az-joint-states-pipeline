@@ -4,7 +4,8 @@
 DEVELOPMENTAL_CONTRAST <- "control_late_vs_early"
 DEVELOPMENTAL_COHORTS <- c("gain", "loss")
 COHORT_BY_STATE <- c("+" = "gain", "-" = "loss", "0" = "no_detected_change", "N" = "untestable")
-COHORT_LABELS <- c(gain = "Developmental gain (control late > early)", loss = "Developmental loss (control late < early)")
+COHORT_LABELS <- c(gain = "Developmental gain (control late > early)", loss = "Developmental loss (control late < early)",
+                   all = "All developmental-comparison peaks")
 RESPONSE_PREFIXES <- c(early = "early_KO_vs_control", late = "late_KO_vs_control",
                        ko_developmental = "KO_late_vs_early", interaction = "stage_genotype_interaction")
 RESPONSE_STAGES <- c("early", "late")
@@ -12,6 +13,10 @@ STAGE_LABELS <- c(early = "Early cKO vs control", late = "Late cKO vs control")
 RESPONSE_STATE_LEVELS <- c("+", "-", "0", "N")
 RESPONSE_STATE_LABELS <- c("+" = "Increased", "-" = "Decreased", "0" = "No detected change", "N" = "Untestable")
 RESPONSE_STATE_COLORS <- c(Increased = "#D55E00", Decreased = "#0072B2", `No detected change` = "#999999", Untestable = "#CC79A7")
+SIGNIFICANCE_COLORS <- c(`Neither significant` = "#999999", `Developmental only` = "#0072B2",
+                         `Genotype only` = "#D55E00", `Both significant` = "#CC79A7")
+TESTABILITY_SHAPES <- c(`Both testable` = 16, `Developmental untestable` = 17,
+                        `Genotype untestable` = 15, `Both untestable` = 4)
 INTERACTION_SHAPES <- c(Increased = 2, Decreased = 6, `No detected change` = 1, Untestable = 4)
 HEATMAP_GROUP_ORDER <- c("EC", "LC", "EK", "LK")
 HEATMAP_GROUP_LABELS <- c(EC = "Early control", LC = "Late control", EK = "Early cKO", LK = "Late cKO")
@@ -67,13 +72,16 @@ developmental_cohorts <- function(calls, master_ids) {
   do.call(rbind, pieces)
 }
 
-developmental_responses <- function(calls, cohorts) {
-  members <- cohorts[cohorts$cohort %in% DEVELOPMENTAL_COHORTS, , drop = FALSE]
-  members <- members[order(match(members$anchor_mark, MARKS), match(members$cohort, DEVELOPMENTAL_COHORTS),
+developmental_responses <- function(calls, cohorts, all_peaks = FALSE) {
+  members <- cohorts[all_peaks | cohorts$cohort %in% DEVELOPMENTAL_COHORTS, , drop = FALSE]
+  if (all_peaks) members$cohort <- "all"
+  levels <- if (all_peaks) "all" else DEVELOPMENTAL_COHORTS
+  members <- members[order(match(members$anchor_mark, MARKS), match(members$cohort, levels),
                            seq_len(nrow(members))), , drop = FALSE]
   pieces <- lapply(MARKS, function(response_mark) {
     out <- data.frame(anchor_mark = members$anchor_mark, cohort = members$cohort, locus_id = members$locus_id,
                       response_mark = rep(response_mark, nrow(members)),
+                      developmental_state = members$developmental_state, developmental_reason = members$developmental_reason,
                       developmental_lfc = members$developmental_lfc, developmental_padj = members$developmental_padj,
                       stringsAsFactors = FALSE)
     for (prefix in names(RESPONSE_PREFIXES)) {
@@ -89,7 +97,7 @@ developmental_responses <- function(calls, cohorts) {
     out
   })
   out <- do.call(rbind, pieces)
-  out <- out[order(match(out$anchor_mark, MARKS), match(out$cohort, DEVELOPMENTAL_COHORTS),
+  out <- out[order(match(out$anchor_mark, MARKS), match(out$cohort, levels),
                    match(out$response_mark, MARKS), out$member_index), , drop = FALSE]
   out$member_index <- NULL
   rownames(out) <- NULL
@@ -97,9 +105,9 @@ developmental_responses <- function(calls, cohorts) {
 }
 
 # Denominators are the selected response mark/stage's testable cohort loci; 0 stays counted.
-developmental_response_counts <- function(responses) {
+developmental_response_counts <- function(responses, cohort_levels = DEVELOPMENTAL_COHORTS) {
   rows <- list()
-  for (anchor in MARKS) for (cohort in DEVELOPMENTAL_COHORTS) for (response in MARKS) for (stage in RESPONSE_STAGES) {
+  for (anchor in MARKS) for (cohort in cohort_levels) for (response in MARKS) for (stage in RESPONSE_STAGES) {
     states <- responses[[paste0(stage, "_state")]][responses$anchor_mark == anchor & responses$cohort == cohort &
                                                       responses$response_mark == response]
     total <- length(states)
@@ -169,9 +177,9 @@ developmental_signal <- function(dds, row_mapping, samples, master) {
 
 # Deterministic heatmap row manifest shared by every response mark.
 
-heatmap_row_manifest <- function(responses, page_size = HEATMAP_PAGE_SIZE) {
+heatmap_row_manifest <- function(responses, page_size = HEATMAP_PAGE_SIZE, cohort_levels = DEVELOPMENTAL_COHORTS) {
   pieces <- list()
-  for (anchor in MARKS) for (cohort in DEVELOPMENTAL_COHORTS) {
+  for (anchor in MARKS) for (cohort in cohort_levels) {
     x <- responses[responses$anchor_mark == anchor & responses$cohort == cohort & responses$response_mark == anchor, , drop = FALSE]
     if (!nrow(x)) next
     x <- x[order(match(x$late_state, RESPONSE_STATE_LEVELS), -abs(x$developmental_lfc), x$locus_id, method = "radix"), , drop = FALSE]
@@ -189,9 +197,18 @@ heatmap_row_manifest <- function(responses, page_size = HEATMAP_PAGE_SIZE) {
   do.call(rbind, pieces)
 }
 
-developmental_scatter_summary <- function(responses) {
+developmental_scatter_classes <- function(responses) {
+  dev <- responses$developmental_state %in% c("+", "-")
+  gen <- responses$late_state %in% c("+", "-")
+  dev_n <- responses$developmental_state == "N"
+  gen_n <- responses$late_state == "N"
+  data.frame(significance_class = names(SIGNIFICANCE_COLORS)[1L + as.integer(dev) + 2L * as.integer(gen)],
+             testability_class = names(TESTABILITY_SHAPES)[1L + as.integer(dev_n) + 2L * as.integer(gen_n)])
+}
+
+developmental_scatter_summary <- function(responses, cohort_levels = DEVELOPMENTAL_COHORTS) {
   rows <- list()
-  for (anchor in MARKS) for (cohort in DEVELOPMENTAL_COHORTS) for (response in MARKS) {
+  for (anchor in MARKS) for (cohort in cohort_levels) for (response in MARKS) {
     x <- responses[responses$anchor_mark == anchor & responses$cohort == cohort & responses$response_mark == response, , drop = FALSE]
     finite <- is.finite(x$developmental_lfc) & is.finite(x$late_lfc)
     rows[[length(rows) + 1L]] <- data.frame(anchor_mark = anchor, cohort = cohort, response_mark = response,
@@ -199,13 +216,22 @@ developmental_scatter_summary <- function(responses) {
                                             excluded_nonfinite = sum(!finite),
                                             interaction_detected = sum(finite & x$interaction_state %in% c("+", "-")),
                                             stringsAsFactors = FALSE)
+    if (identical(cohort_levels, "all")) {
+      classes <- developmental_scatter_classes(x[finite, , drop = FALSE])
+      for (i in seq_along(SIGNIFICANCE_COLORS)) {
+        rows[[length(rows)]][[c("neither_significant", "developmental_only", "genotype_only", "both_significant")[[i]]]] <-
+          sum(classes$significance_class == names(SIGNIFICANCE_COLORS)[[i]])
+      }
+      rows[[length(rows)]]$developmental_untestable <- sum(x$developmental_state[finite] == "N")
+      rows[[length(rows)]]$genotype_untestable <- sum(x$late_state[finite] == "N")
+    }
   }
   do.call(rbind, rows)
 }
 
 # Captions shared by the three figure families.
 
-developmental_caption <- function(normalization, family, multi_batch = FALSE, same_mark = FALSE) {
+developmental_caption <- function(normalization, family, multi_batch = FALSE, same_mark = FALSE, all_peaks = FALSE) {
   normalization_text <- if (identical(normalization, "background")) {
     "Background normalization: relative enrichment; no absolute genome-wide gain/loss claim."
   } else {
@@ -215,17 +241,28 @@ developmental_caption <- function(normalization, family, multi_batch = FALSE, sa
     "+/- = per-mark BH FDR < 0.05 (no fold-change threshold); 0 = no detected change, not demonstrated stability; N = untestable.",
     normalization_text,
     "H2AZac and H2AZub are separate enrichment signals, not stoichiometric modification fractions.",
-    "Descriptive frequencies conditional on control-based cohort selection (control late vs early), not an independently validated estimate of Bap1 dependence.",
-    "Same-mark early/late responses and interactions reuse control samples used for selection, so noise can favor early increases, late decreases and negative interactions in gain cohorts (opposite for loss cohorts).",
+    if (all_peaks) "All master loci in the developmental comparison are included; response frequencies exclude only response-untestable loci." else
+      "Descriptive frequencies conditional on control-based cohort selection (control late vs early), not an independently validated estimate of Bap1 dependence.",
+    if (!all_peaks) "Same-mark early/late responses and interactions reuse control samples used for selection, so noise can favor early increases, late decreases and negative interactions in gain cohorts (opposite for loss cohorts).",
     if (!same_mark) "Cross-mark panels avoid shared libraries but may share animals and biological variation."
   )
   if (identical(family, "heatmap")) {
-    parts <- c(parts, "Fill: row z-score of log2(DESeq2-normalized count + 1) across all samples of the displayed mark; colors clipped to [-3, 3]. Control trajectories are selected by construction; normalized counts are descriptive, not model estimates.")
+    parts <- c(parts, if (all_peaks)
+      "Fill: row z-score of log2(DESeq2-normalized count + 1) across all samples of the displayed mark; colors clipped to [-3, 3]. Normalized counts are descriptive, not model estimates." else
+      "Fill: row z-score of log2(DESeq2-normalized count + 1) across all samples of the displayed mark; colors clipped to [-3, 3]. Control trajectories are selected by construction; normalized counts are descriptive, not model estimates.")
     if (multi_batch) parts <- c(parts, "Multiple batches present: displayed normalized counts are not batch-corrected.")
   } else if (identical(family, "scatter")) {
-    parts <- c(parts, "Same-mark x and y share late-control samples, so an apparent anticorrelation is not independent evidence of reversal. Shape = response-mark interaction (LK-EK)-(LC-EC): an altered trajectory, not evidence of direct BAP1 binding nor a failure-to-acquire classification.")
+    parts <- c(parts, "Same-mark x and y share late-control samples, so an apparent anticorrelation is not independent evidence of reversal.",
+               if (all_peaks) "Color represents detected significance; untestable is not established nonsignificance. Shape indicates which comparisons are untestable." else
+                 "Shape = response-mark interaction (LK-EK)-(LC-EC): an altered trajectory, not evidence of direct BAP1 binding nor a failure-to-acquire classification.")
   }
   paste(strwrap(paste(parts, collapse = " "), width = if (same_mark) 120 else 190), collapse = "\n")
+}
+
+render_developmental_svg <- function(path, plot, width, height) {
+  grDevices::svg(path, width = width, height = height, onefile = FALSE)
+  on.exit(grDevices::dev.off())
+  print(plot)
 }
 
 # Figure builders; callers own graphics devices.
@@ -324,6 +361,31 @@ plot_developmental_scatter <- function(responses, summary, anchor_mark, caption,
   }
   x <- factorize(x)
   s <- factorize(s)
+  if (identical(cohort_levels, "all")) {
+    classes <- developmental_scatter_classes(x)
+    x$significance_f <- factor(classes$significance_class, levels = names(SIGNIFICANCE_COLORS))
+    x$testability_f <- factor(classes$testability_class, levels = names(TESTABILITY_SHAPES))
+    x <- x[order(x$significance_f), , drop = FALSE]
+    s$label <- sprintf("total = %d; plotted = %d; nonfinite excluded = %d\nDevelopmental untestable = %d; genotype untestable = %d",
+                       s$cohort_total, s$plotted, s$excluded_nonfinite, s$developmental_untestable, s$genotype_untestable)
+    return(ggplot2::ggplot() +
+      ggplot2::geom_hline(yintercept = 0, colour = "grey60") +
+      ggplot2::geom_vline(xintercept = 0, colour = "grey60") +
+      ggplot2::geom_point(data = x, ggplot2::aes(x = developmental_lfc, y = late_lfc, colour = significance_f, shape = testability_f),
+                          alpha = 0.5, size = 1.2, show.legend = TRUE) +
+      ggplot2::geom_text(data = s, ggplot2::aes(x = -ex, y = ey, label = label), hjust = 0, vjust = 1, size = 2.6, lineheight = 0.9) +
+      ggplot2::facet_wrap(~response_f, nrow = 1, drop = FALSE, labeller = ggplot2::labeller(response_f = function(v) paste("Response mark:", v))) +
+      ggplot2::coord_cartesian(xlim = c(-ex, ex), ylim = c(-ey, ey)) +
+      ggplot2::scale_colour_manual(values = SIGNIFICANCE_COLORS, limits = names(SIGNIFICANCE_COLORS), drop = FALSE, name = "Detected significance") +
+      ggplot2::scale_shape_manual(values = TESTABILITY_SHAPES, limits = names(TESTABILITY_SHAPES), drop = FALSE, name = "Testability") +
+      ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(shape = 16, alpha = 1, size = 2.5)),
+                      shape = ggplot2::guide_legend(override.aes = list(colour = "black", alpha = 1, size = 2.5))) +
+      ggplot2::labs(title = sprintf("%s all developmental-comparison peaks: developmental versus late cKO effect", anchor_mark),
+                    x = sprintf("%s control late vs early log2 fold change", anchor_mark),
+                    y = "Response mark late cKO vs control log2 fold change", caption = caption) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(plot.caption = ggplot2::element_text(hjust = 0, size = 7), legend.position = "bottom"))
+  }
   state_levels <- unname(RESPONSE_STATE_LABELS[RESPONSE_STATE_LEVELS])
   x$late_f <- factor(unname(RESPONSE_STATE_LABELS[x$late_state]), levels = state_levels)
   x$interaction_f <- factor(unname(RESPONSE_STATE_LABELS[x$interaction_state]), levels = state_levels)
