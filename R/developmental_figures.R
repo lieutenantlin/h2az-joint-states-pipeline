@@ -297,7 +297,9 @@ plot_developmental_frequencies <- function(counts, anchor_mark, caption,
     ggplot2::scale_y_continuous(limits = c(0, 124), breaks = seq(0, 100, 25)) +
     ggplot2::scale_fill_manual(values = RESPONSE_STATE_COLORS[fill_levels], limits = fill_levels, drop = FALSE,
                                name = "cKO response") +
-    ggplot2::labs(title = sprintf("Bap1 cKO responses at %s developmental loci", anchor_mark),
+    ggplot2::labs(title = if (identical(cohort_levels, "all"))
+                    sprintf("Bap1 cKO responses at %s all developmental-comparison peaks", anchor_mark) else
+                    sprintf("Bap1 cKO responses at %s developmental loci", anchor_mark),
                   x = NULL, y = "% of testable cohort loci", caption = caption) +
     ggplot2::theme_bw() +
     ggplot2::theme(plot.caption = ggplot2::element_text(hjust = 0, size = 7), legend.position = "bottom")

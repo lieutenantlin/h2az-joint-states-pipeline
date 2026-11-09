@@ -7,6 +7,9 @@ source("config/settings.R")
 for (pkg in c("ggplot2", "DESeq2", "GenomicRanges")) {
   if (!requireNamespace(pkg, quietly = TRUE)) stop(sprintf("%s is required for developmental figures", pkg), call. = FALSE)
 }
+if (!isTRUE(capabilities("cairo"))) {
+  stop("Cairo support is required for developmental PNG and SVG output", call. = FALSE)
+}
 
 master_path <- "results/03_master/master_regions.rds"
 inventory_path <- "results/01_inventory/samples_validated.csv"
@@ -44,19 +47,12 @@ signals <- lapply(stats::setNames(MARKS, MARKS), function(mark) {
            error = function(e) stop(sprintf("%s: %s", mark, conditionMessage(e)), call. = FALSE))
 })
 cohorts <- developmental_cohorts(calls, master_ids)
-responses <- developmental_responses(calls, cohorts)
-counts <- developmental_response_counts(responses)
-manifest <- heatmap_row_manifest(responses)
-scatter_summary <- developmental_scatter_summary(responses)
 
 out <- "results/developmental_responses"
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
-write_tsv <- function(x, name) utils::write.table(x, file.path(out, name), sep = "\t", row.names = FALSE, quote = FALSE, na = "NA")
-write_tsv(cohorts, "developmental_cohorts.tsv")
-write_tsv(responses, "developmental_locus_responses.tsv")
-write_tsv(counts, "response_frequencies.tsv")
-write_tsv(manifest, "heatmap_rows.tsv")
-write_tsv(scatter_summary, "scatter_summary.tsv")
+write_tsv <- function(x, name, directory = out) {
+  utils::write.table(x, file.path(directory, name), sep = "\t", row.names = FALSE, quote = FALSE, na = "NA")
+}
 for (mark in MARKS) {
   for (kind in c("log2_counts", "row_z")) {
     m <- signals[[mark]][[kind]]
@@ -77,36 +73,74 @@ render_png <- function(path, plot, width, height) {
   print(plot)
 }
 
-# Remove only this stage's paged heatmap PNGs so a smaller cohort cannot leave obsolete pages.
-page_pattern <- sprintf("^heatmap_(%s)_(gain|loss)_(%s)_page_[0-9]{3,}\\.png$", paste(MARKS, collapse = "|"), paste(MARKS, collapse = "|"))
-stale <- list.files(out, pattern = page_pattern, full.names = TRUE)
-if (length(stale)) unlink(stale)
-
 multi_batch <- "batch" %in% names(samples) &&
   any(vapply(samples_by_mark, function(x) length(unique(x$batch)) > 1L, logical(1)))
-for (anchor in MARKS) {
-  p <- plot_developmental_frequencies(counts, anchor, developmental_caption(NORMALIZATION, "frequency"))
-  render_pdf(file.path(out, sprintf("response_frequency_%s.pdf", anchor)), list(p), 14, 8)
-  render_png(file.path(out, sprintf("response_frequency_%s.png", anchor)), p, 2100, 1200)
-  p <- plot_developmental_scatter(responses, scatter_summary, anchor, developmental_caption(NORMALIZATION, "scatter"))
-  render_pdf(file.path(out, sprintf("developmental_vs_late_cKO_%s.pdf", anchor)), list(p), 14, 8)
-  render_png(file.path(out, sprintf("developmental_vs_late_cKO_%s.png", anchor)), p, 2100, 1200)
-  for (cohort in DEVELOPMENTAL_COHORTS) {
-    rows <- manifest[manifest$anchor_mark == anchor & manifest$cohort == cohort, , drop = FALSE]
-    pages <- if (nrow(rows)) sort(unique(rows$page)) else 1L
-    for (response in MARKS) {
-      stem <- sprintf("heatmap_%s_%s_%s", anchor, cohort, response)
-      plots <- lapply(pages, function(page) {
-        plot_developmental_heatmap(
-          signals[[response]]$row_z, rows[rows$page == page, , drop = FALSE], samples_by_mark[[response]],
-          sprintf("%s signal at %s developmental-%s loci (page %d of %d)", response, anchor, cohort, page, length(pages)),
-          developmental_caption(NORMALIZATION, "heatmap", multi_batch))
-      })
-      render_pdf(file.path(out, paste0(stem, ".pdf")), plots, 14, 10)
-      for (i in seq_along(pages)) render_png(file.path(out, sprintf("%s_page_%03d.png", stem, pages[[i]])), plots[[i]], 2100, 1500)
+
+render_view <- function(all_peaks = FALSE) {
+  view_out <- if (all_peaks) file.path(out, "all_peaks") else out
+  cohort_levels <- if (all_peaks) "all" else DEVELOPMENTAL_COHORTS
+  responses <- developmental_responses(calls, cohorts, all_peaks = all_peaks)
+  counts <- developmental_response_counts(responses, cohort_levels = cohort_levels)
+  manifest <- heatmap_row_manifest(responses, cohort_levels = cohort_levels)
+  scatter_summary <- developmental_scatter_summary(responses, cohort_levels = cohort_levels)
+  dir.create(view_out, recursive = TRUE, showWarnings = FALSE)
+  write_tsv(cohorts, "developmental_cohorts.tsv", view_out)
+  write_tsv(responses, "developmental_locus_responses.tsv", view_out)
+  write_tsv(counts, "response_frequencies.tsv", view_out)
+  write_tsv(manifest, "heatmap_rows.tsv", view_out)
+  write_tsv(scatter_summary, "scatter_summary.tsv", view_out)
+
+  # Remove only this view's paged heatmaps so smaller cohorts cannot leave obsolete pages.
+  page_pattern <- sprintf("^heatmap_(%s)_(%s)_(%s)_page_[0-9]{3,}\\.(png|svg)$",
+                          paste(MARKS, collapse = "|"), paste(cohort_levels, collapse = "|"),
+                          paste(MARKS, collapse = "|"))
+  stale <- list.files(view_out, pattern = page_pattern, full.names = TRUE)
+  if (length(stale)) unlink(stale)
+
+  for (anchor in MARKS) {
+    p <- plot_developmental_frequencies(
+      counts, anchor, developmental_caption(NORMALIZATION, "frequency", all_peaks = all_peaks),
+      cohort_levels = cohort_levels)
+    stem <- file.path(view_out, sprintf("response_frequency_%s", anchor))
+    render_pdf(paste0(stem, ".pdf"), list(p), 14, 8)
+    render_png(paste0(stem, ".png"), p, 2100, 1200)
+    render_developmental_svg(paste0(stem, ".svg"), p, 14, 8)
+    p <- plot_developmental_scatter(
+      responses, scatter_summary, anchor, developmental_caption(NORMALIZATION, "scatter", all_peaks = all_peaks),
+      cohort_levels = cohort_levels)
+    stem <- file.path(view_out, sprintf("developmental_vs_late_cKO_%s", anchor))
+    render_pdf(paste0(stem, ".pdf"), list(p), 14, 8)
+    render_png(paste0(stem, ".png"), p, 2100, 1200)
+    render_developmental_svg(paste0(stem, ".svg"), p, 14, 8)
+    for (cohort in cohort_levels) {
+      rows <- manifest[manifest$anchor_mark == anchor & manifest$cohort == cohort, , drop = FALSE]
+      pages <- if (nrow(rows)) sort(unique(rows$page)) else 1L
+      for (response in MARKS) {
+        stem <- sprintf("heatmap_%s_%s_%s", anchor, cohort, response)
+        plots <- lapply(pages, function(page) {
+          title <- if (all_peaks) {
+            sprintf("%s signal at %s all developmental-comparison peaks (page %d of %d)",
+                    response, anchor, page, length(pages))
+          } else {
+            sprintf("%s signal at %s developmental-%s loci (page %d of %d)",
+                    response, anchor, cohort, page, length(pages))
+          }
+          plot_developmental_heatmap(
+            signals[[response]]$row_z, rows[rows$page == page, , drop = FALSE], samples_by_mark[[response]],
+            title, developmental_caption(NORMALIZATION, "heatmap", multi_batch, all_peaks = all_peaks))
+        })
+        render_pdf(file.path(view_out, paste0(stem, ".pdf")), plots, 14, 10)
+        for (i in seq_along(pages)) {
+          page_stem <- file.path(view_out, sprintf("%s_page_%03d", stem, pages[[i]]))
+          render_png(paste0(page_stem, ".png"), plots[[i]], 2100, 1500)
+          render_developmental_svg(paste0(page_stem, ".svg"), plots[[i]], 14, 10)
+        }
+      }
     }
   }
 }
+render_view()
+if (DEVELOPMENTAL_ALL_PEAKS) render_view(all_peaks = TRUE)
 cohort_sizes <- with(cohorts[cohorts$cohort %in% DEVELOPMENTAL_COHORTS, ], table(anchor_mark, cohort))
 print(cohort_sizes)
 cat("Wrote development-anchored response tables and figures to", out, "\n")
