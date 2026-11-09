@@ -276,7 +276,7 @@ all_plot <- plot_developmental_scatter(all_responses, all_summary, "H2AZub", "",
 all_build <- ggplot2::ggplot_build(all_plot)
 expect_equal(nrow(all_build$layout$layout), 3L)
 cross_panel <- all_build$layout$layout$PANEL[all_build$layout$layout$response_f == "H2AZac"]
-plotted <- all_build$data[[3L]][all_build$data[[3L]]$PANEL == cross_panel, ]
+plotted <- all_build$data[[4L]][all_build$data[[4L]]$PANEL == cross_panel, ]
 expected_colors <- c("#CC79A7", "#0072B2", "#D55E00", "#999999", "#999999", "#999999", "#999999")
 expected_shapes <- c(16, 16, 16, 16, 17, 15, 4)
 for (i in seq_len(7L)) {

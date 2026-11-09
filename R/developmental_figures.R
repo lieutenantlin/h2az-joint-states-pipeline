@@ -373,9 +373,9 @@ plot_developmental_scatter <- function(responses, summary, anchor_mark, caption,
     return(ggplot2::ggplot() +
       ggplot2::geom_hline(yintercept = 0, colour = "grey60") +
       ggplot2::geom_vline(xintercept = 0, colour = "grey60") +
+      ggplot2::geom_text(data = s, ggplot2::aes(x = -ex, y = ey, label = label), hjust = 0, vjust = 1, size = 2.6, lineheight = 0.9) +
       ggplot2::geom_point(data = x, ggplot2::aes(x = developmental_lfc, y = late_lfc, colour = significance_f, shape = testability_f),
                           alpha = 0.5, size = 1.2, show.legend = TRUE) +
-      ggplot2::geom_text(data = s, ggplot2::aes(x = -ex, y = ey, label = label), hjust = 0, vjust = 1, size = 2.6, lineheight = 0.9) +
       ggplot2::facet_wrap(~response_f, nrow = 1, drop = FALSE, labeller = ggplot2::labeller(response_f = function(v) paste("Response mark:", v))) +
       ggplot2::coord_cartesian(xlim = c(-ex, ex), ylim = c(-ey, ey)) +
       ggplot2::scale_colour_manual(values = SIGNIFICANCE_COLORS, limits = names(SIGNIFICANCE_COLORS), drop = FALSE, name = "Detected significance") +
